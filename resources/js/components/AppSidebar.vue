@@ -14,27 +14,47 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-vue-next';
+import { LayoutDashboard, CalendarDays, Coffee, Users, Settings, Activity, HelpCircle } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
-        icon: LayoutGrid,
+        icon: LayoutDashboard,
+    },
+    {
+        title: 'Reservaciones',
+        href: '/admin/reservations',
+        icon: CalendarDays,
+    },
+    {
+        title: 'Productos Minibar',
+        href: '/admin/products',
+        icon: Coffee,
+    },
+    {
+        title: 'Huéspedes',
+        href: '#',
+        icon: Users,
+    },
+    {
+        title: 'Actividad',
+        href: '#',
+        icon: Activity,
     },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
+        title: 'Configuración',
+        href: '#',
+        icon: Settings,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
+        title: 'Ayuda y Soporte',
+        href: '#',
+        icon: HelpCircle,
     },
 ];
 </script>

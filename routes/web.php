@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -14,4 +16,9 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-require __DIR__.'/settings.php';
+Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
+    Route::resource('products', ProductController::class);
+    Route::resource('reservations', ReservationController::class);
+});
+
+require __DIR__ . '/settings.php';
