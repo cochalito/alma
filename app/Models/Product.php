@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['name', 'description', 'category', 'price', 'stock', 'is_active', 'image_url'];
+    protected $fillable = ['name', 'description', 'category', 'stock', 'price', 'status'];
 
     public function reservations()
     {

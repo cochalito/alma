@@ -96,8 +96,8 @@
     --card-foreground: hsl(0 0% 3.9%);
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(0 0% 3.9%);
-    --primary: hsl(0 0% 9%);
-    --primary-foreground: hsl(0 0% 98%);
+    --primary: hsl(85 72.5% 44.4%);
+    --primary-foreground: hsl(0 0% 100%);
     --secondary: hsl(0 0% 92.1%);
     --secondary-foreground: hsl(0 0% 9%);
     --muted: hsl(0 0% 96.1%);
@@ -133,8 +133,8 @@
     --card-foreground: hsl(0 0% 98%);
     --popover: hsl(0 0% 3.9%);
     --popover-foreground: hsl(0 0% 98%);
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(0 0% 9%);
+    --primary: hsl(85 72.5% 44.4%);
+    --primary-foreground: hsl(0 0% 100%);
     --secondary: hsl(0 0% 14.9%);
     --secondary-foreground: hsl(0 0% 98%);
     --muted: hsl(0 0% 16.08%);
@@ -169,4 +169,89 @@
     body {
         @apply bg-background text-foreground;
     }
+}
+
+/* ── vue-tel-input: override to match design system ────────────── */
+.vti-custom.vue-tel-input {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--background);
+    font-size: 0.875rem;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    position: relative;
+}
+
+.vti-custom.vue-tel-input:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ring);
+    border-color: var(--ring);
+}
+
+.vti-custom .vti__dropdown {
+    background-color: var(--background);
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    padding: 0 0.5rem;
+}
+
+.vti-custom .vti__dropdown:hover,
+.vti-custom .vti__dropdown.open {
+    background-color: var(--muted);
+}
+
+.vti-custom .vti__dropdown-list {
+    background-color: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 9999;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.vti-custom .vti__dropdown-item {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    padding: 0.4rem 0.75rem;
+}
+
+.vti-custom .vti__dropdown-item:hover,
+.vti-custom .vti__dropdown-item.highlighted {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.vti-custom .vti__input {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    outline: none;
+    width: 100%;
+}
+
+.vti-custom .vti__input::placeholder {
+    color: var(--muted-foreground);
+}
+
+/* dark mode */
+.dark .vti-custom.vue-tel-input {
+    border-color: var(--border);
+    background-color: var(--background);
+}
+
+.dark .vti-custom .vti__dropdown {
+    background-color: var(--background);
+    border-right-color: var(--border);
+}
+
+.dark .vti-custom .vti__dropdown-list {
+    background-color: var(--popover);
+    border-color: var(--border);
+}
+
+.dark .vti-custom .vti__input {
+    background-color: var(--background);
+    color: var(--foreground);
 }

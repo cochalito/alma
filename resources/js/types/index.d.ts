@@ -38,15 +38,22 @@ export interface User {
 
 export type BreadcrumbItemType = BreadcrumbItem;
 
-// ─── Hotel Domain Types ───────────────────────────────────────────────────────
 
-export interface Room {
+
+export type DocumentType = '1' | '2' | '3' | '4'; // 1 CI, 2 DNI, 3 Pasaporte, 4 Otro
+export type CustomerStatus = '0' | '1'; // 0 Inactivo, 1 Activo
+
+export interface Customer {
     id: number;
-    number: string;
-    type: string;
-    capacity: number;
-    price_per_night: number;
-    description?: string;
+    document_type: DocumentType | null;
+    document_number: string | null;
+    firstname: string;
+    lastname: string;
+    email: string;
+    cellphone: string | null;
+    status: CustomerStatus;
+    created_at: string;
+    updated_at: string;
 }
 
 export type ProductCategory = 'beverages' | 'snacks' | 'toiletries' | 'other';
@@ -72,18 +79,33 @@ export interface ReservationProduct {
     subtotal: number;
 }
 
-export type ReservationStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+export interface Departament {
+    id: number;
+    location: string;
+    code: string;
+    status: '0' | '1';
+    created_at: string;
+    updated_at: string;
+}
+
+export type ReservationStatus = '1' | '2' | '3' | '4'; // 1 Confirmado, 2 Check In, 3 Check Out, 4 Cancelado
 
 export interface Reservation {
     id: number;
-    user: User;
-    room: Room;
+    employee_id: number;
+    departament_id: number;
+    customer_id: number;
+    location: string;
     check_in: string;
     check_out: string;
+    total_stay_cost: number;
+    total_extra_cost: number;
+    requests: string | null;
+    comments: string | null;
     status: ReservationStatus;
-    notes?: string;
-    total_nights: number;
-    total_amount: number;
+    employee?: User;
+    departament?: Departament;
+    customer?: Customer;
     products: ReservationProduct[];
     created_at: string;
     updated_at: string;

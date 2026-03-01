@@ -12,14 +12,17 @@ return new class extends Migration {
     {
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('room_id')->constrained()->onDelete('cascade');
-            $table->date('check_in');
-            $table->date('check_out');
-            $table->enum('status', ['pending', 'active', 'completed', 'cancelled'])->default('pending');
-            $table->text('notes')->nullable();
-            $table->integer('total_nights');
-            $table->decimal('total_amount', 10, 2);
+            $table->foreignId('employee_id');
+            $table->foreignId('departament_id');
+            $table->foreignId('customer_id');
+            $table->string('location', 10)->default('LA PAZ');
+            $table->dateTime('check_in');
+            $table->dateTime('check_out');
+            $table->double('total_stay_cost');
+            $table->double('total_extra_cost');
+            $table->mediumText('requests')->nullable();
+            $table->mediumText('comments')->nullable();
+            $table->enum('status', ['1', '2', '3', '4'])->comment('1 Confirmado, 2 Check In, 3 Check Out, 4 Cancelado');
             $table->timestamps();
         });
     }

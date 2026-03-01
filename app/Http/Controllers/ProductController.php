@@ -8,11 +8,35 @@ use Inertia\Inertia;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::paginate(10);
+        $query = Product::query();
+
+        // Filtering
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
+            });
+        }
+
+        // Sorting
+        $sort = $request->input('sort', 'updated_at');
+        $direction = $request->input('direction', 'desc');
+
+        $allowedSorts = ['id', 'name', 'category', 'price', 'stock', 'is_active', 'updated_at'];
+        if (in_array($sort, $allowedSorts)) {
+            $query->orderBy($sort, $direction);
+        } else {
+            $query->orderBy('updated_at', 'desc');
+        }
+
+        $products = $query->paginate(10)->withQueryString();
+
         return Inertia::render('Admin/Products/Index', [
-            'products' => $products
+            'products' => $products,
+            'filters' => $request->only(['search', 'sort', 'direction'])
         ]);
     }
 

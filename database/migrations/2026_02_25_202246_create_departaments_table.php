@@ -10,13 +10,11 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('rooms', function (Blueprint $table) {
+        Schema::create('departament', function (Blueprint $table) {
             $table->id();
-            $table->string('number');
-            $table->string('type');
-            $table->integer('capacity');
-            $table->decimal('price_per_night', 10, 2);
-            $table->text('description')->nullable();
+            $table->string('location', 10);
+            $table->string('code', 10);
+            $table->enum('status', ['0', '1'])->comment('0 No Disponible, 1 Disponible');
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('rooms');
+        Schema::dropIfExists('departament');
     }
 };

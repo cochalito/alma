@@ -14,32 +14,63 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutDashboard, CalendarDays, Coffee, Users, Settings, Activity, HelpCircle } from 'lucide-vue-next';
+import {
+    LayoutDashboard,
+    CalendarDays,
+    Users,
+    Settings,
+    Activity,
+    HelpCircle,
+    Coffee,
+    Ship,
+    FileText,
+} from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
-const mainNavItems: NavItem[] = [
+const dashboardItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Panel de Control',
         href: dashboard(),
         icon: LayoutDashboard,
     },
+];
+
+const hotelItems: NavItem[] = [
     {
         title: 'Reservaciones',
         href: '/admin/reservations',
         icon: CalendarDays,
     },
     {
-        title: 'Productos Minibar',
-        href: '/admin/products',
-        icon: Coffee,
+        title: 'Charter',
+        href: '/admin/charter',
+        icon: Ship,
     },
     {
         title: 'Huéspedes',
-        href: '#',
+        href: '/admin/customers',
         icon: Users,
     },
     {
-        title: 'Actividad',
+        title: 'Productos',
+        href: '/admin/products',
+        icon: Coffee,
+    },
+];
+
+const reportItems: NavItem[] = [
+    {
+        title: 'Reporte de Reservas',
+        href: '#',
+        icon: FileText,
+    },
+    {
+        title: 'Reporte de Productos',
+        href: '#',
+        icon: FileText,
+    },
+    {
+        title: 'Reporte de Actividad',
         href: '#',
         icon: Activity,
     },
@@ -74,7 +105,9 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :items="dashboardItems" />
+            <NavMain title="Hotel" :items="hotelItems" />
+            <NavMain title="Reportes" :items="reportItems" />
         </SidebarContent>
 
         <SidebarFooter>

@@ -12,13 +12,12 @@ return new class extends Migration {
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->enum('category', ['beverages', 'snacks', 'toiletries', 'other']);
-            $table->decimal('price', 10, 2);
-            $table->integer('stock');
-            $table->boolean('is_active')->default(true);
-            $table->string('image_url')->nullable();
+            $table->string('name', 255);
+            $table->mediumText('description')->nullable();
+            $table->enum('category', ['1', '2', '3', '4'])->comment('1 Bebidas, 2 Snaks, 3 Articulos de baño, 4 Otros');
+            $table->bigInteger('stock');
+            $table->double('price');
+            $table->enum('status', ['1', '2'])->comment('1 Activo, 2 Inactivo');
             $table->timestamps();
         });
     }

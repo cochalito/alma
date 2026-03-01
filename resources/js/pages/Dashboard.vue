@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
+import VueApexCharts from 'vue3-apexcharts';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
@@ -12,7 +13,10 @@ import {
     Users,
     Clock,
     CheckCircle2,
-    Plus
+    Plus,
+    UserPlus,
+    UserCheck,
+    DoorClosed,
 } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -22,48 +26,146 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Mock data para darle vida al dashboard
-const stats = [
-    {
-        title: 'Reservas Hoy',
-        value: '12',
-        trend: '+2.5%',
-        icon: CalendarDays,
-        bgGradient: 'from-blue-500 to-indigo-600',
-        textColor: 'text-blue-100',
-    },
-    {
-        title: 'Ingresos Mensuales',
-        value: '$14,500',
-        trend: '+15.2%',
-        icon: DollarSign,
-        bgGradient: 'from-emerald-400 to-teal-500',
-        textColor: 'text-emerald-100',
-    },
-    {
-        title: 'Huéspedes Activos',
-        value: '48',
-        trend: '+5.0%',
-        icon: Users,
-        bgGradient: 'from-orange-400 to-pink-500',
-        textColor: 'text-orange-100',
-    },
-    {
-        title: 'Habitaciones Libres',
-        value: '15',
-        trend: '-2.4%',
-        icon: DoorOpen,
-        bgGradient: 'from-purple-500 to-indigo-500',
-        textColor: 'text-purple-100',
-    },
-];
+interface StatSplit {
+    LP: number;
+    UYUNI: number;
+}
 
-const recentActivity = [
-    { id: 1, text: 'Check-in: Familia González (Hab. 204)', time: 'Hace 15 min', icon: CheckCircle2, color: 'text-emerald-500' },
-    { id: 2, text: 'Nueva reserva: Juan Carlos (Hab. 101)', time: 'Hace 1 hora', icon: Plus, color: 'text-blue-500' },
-    { id: 3, text: 'Consumo minibar: Hab 305 ($45.00)', time: 'Hace 2 horas', icon: CreditCard, color: 'text-orange-500' },
-    { id: 4, text: 'Check-out: Empresa X (Hab. 412)', time: 'Hace 4 horas', icon: Clock, color: 'text-gray-500' },
-];
+interface Props {
+    stats: {
+        checkInsToday: StatSplit;
+        checkOutsToday: StatSplit;
+        occupiedDepartmentsToday: StatSplit;
+        freeDepartmentsToday: StatSplit;
+    };
+    recentReservations: Array<{
+        id: number;
+        location: string;
+        departament_code: string;
+        customer_name: string;
+        check_in: string;
+        check_out: string;
+        total_cost: number;
+        status: string;
+        updated_at: string;
+    }>;
+    chartData: {
+        categories: string[];
+        series: Array<{
+            name: string;
+            data: number[];
+        }>;
+    };
+}
+
+const props = defineProps<Props>();
+
+import { computed } from 'vue';
+
+function getStatusConfig(status: string) {
+    switch (status) {
+        case '1': return { label: 'Confirmada', class: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' };
+        case '2': return { label: 'Check-In', class: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' };
+        case '3': return { label: 'Check-Out', class: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' };
+        case '4': return { label: 'Cancelada', class: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' };
+        default: return { label: 'Desconocido', class: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' };
+    }
+}
+
+const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s(\d{2}:\d{2})/);
+    if (match) {
+        return `${match[3]}/${match[2]}/${match[1]} ${match[4]}`;
+    }
+    return dateStr;
+};
+
+const dashboardStats = computed(() => [
+    {
+        title: 'Check-In para hoy',
+        lp: props.stats.checkInsToday.LP.toString(),
+        uyuni: props.stats.checkInsToday.UYUNI.toString(),
+        icon: UserPlus,
+        bgClass: 'bg-[#7FC31F] text-white',
+    },
+    {
+        title: 'Check-Out para hoy',
+        lp: props.stats.checkOutsToday.LP.toString(),
+        uyuni: props.stats.checkOutsToday.UYUNI.toString(),
+        icon: UserCheck,
+        bgClass: 'bg-[#6AA11A] text-white',
+    },
+    {
+        title: 'Deptos. Ocupados',
+        lp: props.stats.occupiedDepartmentsToday.LP.toString(),
+        uyuni: props.stats.occupiedDepartmentsToday.UYUNI.toString(),
+        icon: DoorClosed,
+        bgClass: 'bg-[#7FC31F] text-white',
+    },
+    {
+        title: 'Deptos. Libres',
+        lp: props.stats.freeDepartmentsToday.LP.toString(),
+        uyuni: props.stats.freeDepartmentsToday.UYUNI.toString(),
+        icon: DoorOpen,
+        bgClass: 'bg-[#6AA11A] text-white',
+    },
+]);
+const chartOptions = computed(() => ({
+    chart: {
+        type: 'area' as const,
+        height: 350,
+        toolbar: { show: false },
+        fontFamily: 'inherit'
+    },
+    dataLabels: {
+        enabled: false
+    },
+    stroke: {
+        curve: 'smooth' as const,
+        width: 2
+    },
+    xaxis: {
+        categories: props.chartData.categories,
+        labels: {
+            style: {
+                colors: '#64748b'
+            }
+        }
+    },
+    yaxis: {
+        title: {
+            text: 'Cantidad',
+            style: { color: '#64748b' }
+        },
+        labels: {
+            style: {
+                colors: '#64748b'
+            }
+        }
+    },
+    fill: {
+        type: 'gradient' as const,
+        gradient: {
+            shadeIntensity: 1,
+            opacityFrom: 0.4,
+            opacityTo: 0.05,
+            stops: [0, 90, 100]
+        }
+    },
+    tooltip: {
+        y: {
+            formatter: function (val: number) {
+                return val + " reservas"
+            }
+        }
+    },
+    legend: {
+        position: 'top' as const,
+        horizontalAlign: 'center' as const
+    },
+    colors: ['#0284c7', '#16a34a', '#ea580c', '#b91c1c'] // Blue, Green, Orange, Red
+}));
 
 </script>
 
@@ -94,24 +196,31 @@ const recentActivity = [
             <!-- Tarjetas de Estadísticas -->
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 <div
-                    v-for="stat in stats"
+                    v-for="stat in dashboardStats"
                     :key="stat.title"
                     class="relative overflow-hidden rounded-2xl p-6 shadow-lg transition-transform hover:-translate-y-1"
-                    :class="`bg-linear-to-br ${stat.bgGradient} text-white`"
+                    :class="stat.bgClass"
                 >
                     <div class="relative z-10">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="font-medium" :class="stat.textColor">{{ stat.title }}</h3>
+                            <h3 class="font-medium text-sm lg:text-base">{{ stat.title }}</h3>
                             <div class="rounded-full bg-white/20 p-2 backdrop-blur-sm">
                                 <component :is="stat.icon" class="h-5 w-5 text-white" />
                             </div>
                         </div>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-3xl font-bold tracking-tight">{{ stat.value }}</span>
-                            <span class="text-sm font-medium flex items-center bg-white/10 px-2 py-0.5 rounded-full" :class="stat.textColor">
-                                <TrendingUp v-if="stat.trend.startsWith('+')" class="mr-1 h-3 w-3" />
-                                {{ stat.trend }}
-                            </span>
+                        <div class="flex items-center gap-6 mt-1">
+                            <!-- La Paz -->
+                            <div>
+                                <span class="text-[10px] uppercase font-bold opacity-80 mb-0.5 block tracking-wider">La Paz</span>
+                                <span class="text-3xl lg:text-4xl font-extrabold tracking-tight leading-none">{{ stat.lp }}</span>
+                            </div>
+                            <!-- Divisor -->
+                            <div class="w-px h-8 bg-white/30 rounded"></div>
+                            <!-- Uyuni -->
+                            <div>
+                                <span class="text-[10px] uppercase font-bold opacity-80 mb-0.5 block tracking-wider">Uyuni</span>
+                                <span class="text-3xl lg:text-4xl font-extrabold tracking-tight leading-none">{{ stat.uyuni }}</span>
+                            </div>
                         </div>
                     </div>
                     <!-- Elementos decorativos de fondo -->
@@ -120,46 +229,71 @@ const recentActivity = [
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Gráfico de Ocupación (Placeholder Visual) -->
-                <div class="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Gráfico de Ocupación por Localidad -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
                     <div class="mb-6 flex items-center justify-between">
-                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Ocupación Semanal</h3>
-                        <span class="text-sm text-slate-500 dark:text-zinc-400">Marzo 2026</span>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Flujo de Reservas (Últimos 10 días)</h3>
                     </div>
-                    <div class="flex h-64 items-end gap-2 sm:gap-4 mt-4">
-                        <div v-for="(height, i) in [40, 70, 45, 90, 65, 30, 80]" :key="i" class="w-full relative group">
-                            <div class="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10">
-                                {{ height }}%
-                            </div>
-                            <div
-                                class="w-full rounded-t-lg bg-linear-to-t from-blue-500 to-cyan-400 transition-all duration-500 group-hover:opacity-80"
-                                :style="`height: ${height}%`"
-                            ></div>
-                            <div class="mt-3 text-center text-xs font-medium text-slate-500 dark:text-zinc-400">
-                                {{ ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][i] }}
-                            </div>
-                        </div>
+                    <div class="mt-4 w-full" style="min-height: 350px;">
+                        <ClientOnly>
+                            <VueApexCharts
+                                type="area"
+                                height="350"
+                                :options="chartOptions"
+                                :series="props.chartData.series"
+                            ></VueApexCharts>
+                        </ClientOnly>
                     </div>
                 </div>
 
-                <!-- Actividad Reciente -->
-                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6">Actividad Reciente</h3>
-                    <div class="space-y-6">
-                        <div v-for="item in recentActivity" :key="item.id" class="flex gap-4">
-                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-zinc-800">
-                                <component :is="item.icon" class="h-4 w-4" :class="item.color" />
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-slate-700 dark:text-zinc-300">{{ item.text }}</p>
-                                <p class="text-xs text-slate-500 dark:text-zinc-500 mt-1">{{ item.time }}</p>
-                            </div>
-                        </div>
+                <!-- Tabla de Reservas Recientes -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+                    <div class="mb-6 flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Reservaciones Modificadas Recientemente</h3>
+                        <Link href="/admin/charter" class="text-sm font-medium text-primary hover:underline">Ir a Charter &rarr;</Link>
                     </div>
-                    <button class="mt-8 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800/50">
-                        Ver todo el historial
-                    </button>
+
+                    <div class="overflow-x-auto rounded-xl border border-border">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-muted text-muted-foreground font-medium text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-3 px-4 border-b border-border">Loc - Depto</th>
+                                    <th class="py-3 px-4 border-b border-border">Fechas</th>
+                                    <th class="py-3 px-4 border-b border-border text-center">Estado</th>
+                                    <th class="py-3 px-4 border-b border-border">Costo Total</th>
+                                    <th class="py-3 px-4 border-b border-border">Editado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border bg-card">
+                                <tr v-if="recentReservations.length === 0">
+                                    <td colspan="5" class="py-8 text-center text-muted-foreground font-medium">No hay reservaciones recientes</td>
+                                </tr>
+                                <tr v-for="res in recentReservations" :key="res.id" class="hover:bg-muted/50 transition-colors">
+                                    <td class="py-3 px-4 align-top">
+                                        <div class="font-bold whitespace-nowrap"><span class="text-xs text-muted-foreground mr-1">{{ res.location }}</span> {{ res.departament_code }}</div>
+                                        <div class="text-[10px] text-muted-foreground truncate max-w-[120px]" :title="res.customer_name">{{ res.customer_name }}</div>
+                                    </td>
+                                    <td class="py-3 px-4 align-top">
+                                        <div class="whitespace-nowrap"><span class="text-xs text-green-600 font-semibold uppercase mr-1">IN</span> {{ formatDateTime(res.check_in) }}</div>
+                                        <div class="whitespace-nowrap mt-1"><span class="text-xs text-red-500 font-semibold uppercase mr-1">OUT</span> {{ formatDateTime(res.check_out) }}</div>
+                                    </td>
+                                    <td class="py-3 px-4 align-top text-center">
+                                        <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap" :class="getStatusConfig(res.status).class">
+                                            {{ getStatusConfig(res.status).label }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4 align-top font-bold text-primary whitespace-nowrap">
+                                        Bs. {{ Number(res.total_cost).toFixed(2) }}
+                                    </td>
+                                    <td class="py-3 px-4 align-top whitespace-nowrap">
+                                        <div class="text-xs font-semibold">Hace momento</div>
+                                        <div class="text-[10px] text-muted-foreground mt-0.5">{{ res.updated_at }}</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
