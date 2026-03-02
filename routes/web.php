@@ -4,6 +4,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\CharterController;
+use App\Http\Controllers\UserController;
 use App\Models\Reservation;
 use App\Models\Departament;
 use Carbon\Carbon;
@@ -12,9 +13,10 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
+    if (auth()->check()) {
+        return redirect('/dashboard');
+    }
+    return redirect('/login');
 })->name('home');
 
 Route::get('dashboard', function () {
@@ -78,13 +80,15 @@ Route::get('dashboard', function () {
         ->whereDate('check_in', '<=', $endDate)
         ->get()
         ->groupBy(function ($res) {
-            return Carbon::parse($res->check_in)->format('Y-m-d'); });
+            return Carbon::parse($res->check_in)->format('Y-m-d');
+        });
 
     $allCheckOuts = Reservation::whereDate('check_out', '>=', $startDate)
         ->whereDate('check_out', '<=', $endDate)
         ->get()
         ->groupBy(function ($res) {
-            return Carbon::parse($res->check_out)->format('Y-m-d'); });
+            return Carbon::parse($res->check_out)->format('Y-m-d');
+        });
 
     $chartDates = collect(range(9, 0))->map(function ($days) use ($today) {
         return $today->copy()->subDays($days)->format('Y-m-d');
@@ -125,10 +129,15 @@ Route::get('dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
+    Route::resource('users', UserController::class);
+    Route::resource('departaments', \App\Http\Controllers\DepartamentController::class);
+    Route::post('customers/quick', [CustomerController::class, 'quickStore'])->name('customers.quick');
     Route::resource('customers', CustomerController::class);
     Route::resource('products', ProductController::class);
     Route::resource('reservations', ReservationController::class);
     Route::get('charter', [CharterController::class, 'index'])->name('charter.index');
+    Route::get('reports/reservations', [\App\Http\Controllers\ReportController::class, 'reservations'])->name('reports.reservations');
+    Route::get('reports/kardex', [\App\Http\Controllers\ReportController::class, 'kardex'])->name('reports.kardex');
 });
 
 require __DIR__ . '/settings.php';

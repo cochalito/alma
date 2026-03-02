@@ -64,7 +64,7 @@ export interface Product {
     description?: string;
     category: ProductCategory;
     price: number;
-    stock: number;
+    total_stock: number;
     is_active: boolean;
     image_url?: string;
     created_at: string;
@@ -83,6 +83,7 @@ export interface Departament {
     id: number;
     location: string;
     code: string;
+    cost: number | null;
     status: '0' | '1';
     created_at: string;
     updated_at: string;

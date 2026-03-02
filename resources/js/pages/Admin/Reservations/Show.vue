@@ -129,15 +129,15 @@ function formatDate(dateStr: string): string {
                     <div class="space-y-2 max-w-md">
                         <div class="flex justify-between">
                             <span class="text-sm text-muted-foreground">Costo de Estadía</span>
-                            <span class="text-sm font-medium">Bs. {{ reservation.total_stay_cost.toFixed(2) }}</span>
+                            <span class="text-sm font-medium">Bs. {{ Number(reservation.total_stay_cost).toFixed(2) }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-sm text-muted-foreground">Gastos Extras</span>
-                            <span class="text-sm font-medium">Bs. {{ reservation.total_extra_cost.toFixed(2) }}</span>
+                            <span class="text-sm font-medium">Bs. {{ Number(reservation.total_extra_cost).toFixed(2) }}</span>
                         </div>
                         <div class="border-t pt-2 mt-2 flex justify-between">
                             <span class="text-base font-bold text-primary">TOTAL</span>
-                            <span class="text-base font-bold text-primary">Bs. {{ (reservation.total_stay_cost + reservation.total_extra_cost).toFixed(2) }}</span>
+                            <span class="text-base font-bold text-primary">Bs. {{ (Number(reservation.total_stay_cost) + Number(reservation.total_extra_cost)).toFixed(2) }}</span>
                         </div>
                     </div>
                 </div>

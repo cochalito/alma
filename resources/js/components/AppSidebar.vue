@@ -24,6 +24,8 @@ import {
     Coffee,
     Ship,
     FileText,
+    User,
+    Building,
 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
@@ -61,18 +63,31 @@ const hotelItems: NavItem[] = [
 const reportItems: NavItem[] = [
     {
         title: 'Reporte de Reservas',
-        href: '#',
+        href: '/admin/reports/reservations',
         icon: FileText,
     },
     {
         title: 'Reporte de Productos',
-        href: '#',
+        href: '/admin/reports/kardex',
         icon: FileText,
     },
     {
         title: 'Reporte de Actividad',
         href: '#',
         icon: Activity,
+    },
+];
+
+const adminItems: NavItem[] = [
+    {
+        title: 'Usuarios',
+        href: '/admin/users',
+        icon: User,
+    },
+    {
+        title: 'Departamentos',
+        href: '/admin/departaments',
+        icon: Building,
     },
 ];
 
@@ -108,6 +123,7 @@ const footerNavItems: NavItem[] = [
             <NavMain :items="dashboardItems" />
             <NavMain title="Hotel" :items="hotelItems" />
             <NavMain title="Reportes" :items="reportItems" />
+            <NavMain title="Admin" :items="adminItems" />
         </SidebarContent>
 
         <SidebarFooter>

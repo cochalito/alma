@@ -21,10 +21,10 @@ defineProps<{
 
 <template>
     <AuthBase
-        title="Log in to your account"
-        description="Enter your email and password below to log in"
+        title="Inicia sesión en tu cuenta"
+        description="Ingresa tu correo y contraseña para continuar"
     >
-        <Head title="Log in" />
+        <Head title="Iniciar sesión" />
 
         <div
             v-if="status"
@@ -41,7 +41,7 @@ defineProps<{
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
+                    <Label for="email">Correo electrónico</Label>
                     <Input
                         id="email"
                         type="email"
@@ -50,21 +50,22 @@ defineProps<{
                         autofocus
                         :tabindex="1"
                         autocomplete="email"
-                        placeholder="email@example.com"
+                        placeholder="correo@ejemplo.com"
+                        class="h-11"
                     />
                     <InputError :message="errors.email" />
                 </div>
 
                 <div class="grid gap-2">
                     <div class="flex items-center justify-between">
-                        <Label for="password">Password</Label>
+                        <Label for="password">Contraseña</Label>
                         <TextLink
                             v-if="canResetPassword"
                             :href="request()"
-                            class="text-sm"
+                            class="text-sm text-[#7FC31F] hover:text-[#6da818]"
                             :tabindex="5"
                         >
-                            Forgot password?
+                            ¿Olvidaste tu contraseña?
                         </TextLink>
                     </div>
                     <Input
@@ -74,37 +75,31 @@ defineProps<{
                         required
                         :tabindex="2"
                         autocomplete="current-password"
-                        placeholder="Password"
+                        placeholder="Tu contraseña"
+                        class="h-11"
                     />
                     <InputError :message="errors.password" />
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <Label for="remember" class="flex items-center space-x-3">
+                    <Label for="remember" class="flex items-center space-x-3 cursor-pointer">
                         <Checkbox id="remember" name="remember" :tabindex="3" />
-                        <span>Remember me</span>
+                        <span class="font-normal text-muted-foreground">Recordarme</span>
                     </Label>
                 </div>
 
                 <Button
                     type="submit"
-                    class="mt-4 w-full"
+                    class="mt-4 w-full h-11 text-base font-medium shadow-md transition-all hover:-translate-y-0.5"
                     :tabindex="4"
                     :disabled="processing"
                     data-test="login-button"
                 >
-                    <Spinner v-if="processing" />
-                    Log in
+                    <Spinner v-if="processing" class="mr-2" />
+                    Iniciar sesión
                 </Button>
             </div>
 
-            <div
-                class="text-center text-sm text-muted-foreground"
-                v-if="canRegister"
-            >
-                Don't have an account?
-                <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
-            </div>
         </Form>
     </AuthBase>
 </template>

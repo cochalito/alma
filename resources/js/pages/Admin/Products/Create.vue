@@ -6,20 +6,30 @@ import { Input } from '@/components/ui/input';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ChevronLeft, Package, Save } from 'lucide-vue-next';
 
+const props = defineProps<{
+    locations: string[];
+}>();
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Productos Minibar', href: '/admin/products' },
     { title: 'Nuevo Producto', href: '/admin/products/create' },
 ];
 
-const form = useForm({
+const initialFormState: Record<string, any> = {
     name: '',
     description: '',
     category: 'beverages',
     price: '',
-    stock: '',
     is_active: true,
+};
+
+// Add stock fields recursively
+props.locations.forEach(loc => {
+    initialFormState['stock_' + loc] = 0;
 });
+
+const form = useForm(initialFormState);
 
 function submit() {
     form.post('/admin/products');
@@ -109,17 +119,21 @@ function submit() {
                             </div>
 
                             <!-- Stock -->
-                            <div class="space-y-1.5">
-                                <label class="text-sm font-medium">Stock disponible *</label>
-                                <Input
-                                    v-model="form.stock"
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    class="max-w-[200px]"
-                                    required
-                                />
-                                <p v-if="form.errors.stock" class="text-xs text-destructive">{{ form.errors.stock }}</p>
+                            <div class="space-y-4 pt-2">
+                                <h3 class="text-sm font-semibold">Stock Inicial por Sucursal *</h3>
+                                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div v-for="loc in locations" :key="loc" class="space-y-1.5">
+                                        <label class="text-xs font-medium">{{ loc }}</label>
+                                        <Input
+                                            v-model="form['stock_' + loc]"
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            required
+                                        />
+                                        <p v-if="form.errors['stock_' + loc]" class="text-xs text-destructive">{{ form.errors['stock_' + loc] }}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

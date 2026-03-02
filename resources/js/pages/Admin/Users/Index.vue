@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem, type PaginatedData, type Product, type ProductCategory } from '@/types';
+import { type BreadcrumbItem, type PaginatedData } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ChevronLeft, ChevronRight, Package, Pencil, Plus, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Users, Pencil, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+}
+
 interface Props {
-    products: PaginatedData<Product>;
+    users: PaginatedData<User>;
     filters?: { search?: string; sort?: string; direction?: string };
 }
 
@@ -20,25 +30,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Productos Minibar', href: '/admin/products' },
+    { title: 'Usuarios', href: '/admin/users' },
 ];
-
-const categoryLabels: Record<ProductCategory, string> = {
-    beverages: 'Bebidas',
-    snacks: 'Snacks',
-    toiletries: 'Toiletries',
-    other: 'Otros',
-};
-
-function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(amount);
-}
-
-function deleteProduct(id: number) {
-    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-        router.delete(`/admin/products/${id}`);
-    }
-}
 
 const search = ref(props.filters?.search ?? '');
 const sortParams = ref({
@@ -47,7 +40,7 @@ const sortParams = ref({
 });
 
 const applyFilters = debounce(() => {
-    router.get('/admin/products', {
+    router.get('/admin/users', {
         search: search.value,
         sort: sortParams.value.sort,
         direction: sortParams.value.direction
@@ -74,7 +67,7 @@ function clearFilters() {
 </script>
 
 <template>
-    <Head title="Productos Minibar" />
+    <Head title="Usuarios" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex flex-col gap-6 p-6">
 
@@ -82,19 +75,19 @@ function clearFilters() {
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Package class="h-5 w-5" />
+                        <Users class="h-5 w-5" />
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold tracking-tight">Productos Minibar</h1>
+                        <h1 class="text-2xl font-bold tracking-tight">Usuarios</h1>
                         <p class="text-sm text-muted-foreground">
-                            {{ products.total }} productos en total
+                            {{ users.total }} usuarios en total
                         </p>
                     </div>
                 </div>
-                <Link href="/admin/products/create">
+                <Link href="/admin/users/create">
                     <Button>
                         <Plus class="mr-2 h-4 w-4" />
-                        Nuevo Producto
+                        Nuevo Usuario
                     </Button>
                 </Link>
             </div>
@@ -102,10 +95,10 @@ function clearFilters() {
             <!-- Filtros -->
             <div class="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col sm:flex-row gap-4 items-end">
                 <div class="flex-1 min-w-[200px] flex flex-col gap-1.5">
-                    <label class="text-xs font-semibold text-muted-foreground uppercase">Buscar Producto</label>
+                    <label class="text-xs font-semibold text-muted-foreground uppercase">Buscar Usuario</label>
                     <div class="relative">
                         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input v-model="search" placeholder="Buscar por Nombre, Descripción o Categoría..." class="pl-9 h-9" />
+                        <Input v-model="search" placeholder="Buscar por Nombre, Correo o Rol..." class="pl-9 h-9" />
                     </div>
                 </div>
                 <Button variant="ghost" size="sm" class="h-9 text-muted-foreground hover:text-foreground" @click="clearFilters" v-if="search">
@@ -123,77 +116,50 @@ function clearFilters() {
                                 <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('name')">
                                     <div class="flex items-center gap-1">Nombre <ArrowUp v-if="sortParams.sort==='name' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='name' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
-                                <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('category')">
-                                    <div class="flex items-center gap-1">Categoría <ArrowUp v-if="sortParams.sort==='category' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='category' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
+                                <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('email')">
+                                    <div class="flex items-center gap-1">Correo Electrónico <ArrowUp v-if="sortParams.sort==='email' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='email' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
-                                <th class="px-4 py-3 text-right font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('price')">
-                                    <div class="flex items-center gap-1 justify-end">Precio <ArrowUp v-if="sortParams.sort==='price' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='price' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
+                                <th class="px-4 py-3 text-center font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('role')">
+                                    <div class="flex items-center gap-1 justify-center">Rol <ArrowUp v-if="sortParams.sort==='role' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='role' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
-                                <th class="px-4 py-3 text-center font-semibold text-muted-foreground">
-                                    <div class="flex items-center gap-1 justify-center">Stock Total</div>
-                                </th>
-                                <th class="px-4 py-3 text-center font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('is_active')">
-                                    <div class="flex items-center gap-1 justify-center">Estado <ArrowUp v-if="sortParams.sort==='is_active' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='is_active' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
+                                <th class="px-4 py-3 text-center font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('status')">
+                                    <div class="flex items-center gap-1 justify-center">Estado <ArrowUp v-if="sortParams.sort==='status' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='status' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
                                 <th class="px-4 py-3 text-right font-semibold text-muted-foreground">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="products.data.length === 0">
-                                <td colspan="6" class="px-4 py-12 text-center text-muted-foreground">
-                                    No hay productos registrados aún.
+                            <tr v-if="users.data.length === 0">
+                                <td colspan="5" class="px-4 py-12 text-center text-muted-foreground">
+                                    No hay usuarios registrados aún.
                                 </td>
                             </tr>
                             <tr
-                                v-for="product in products.data"
-                                :key="product.id"
+                                v-for="user in users.data"
+                                :key="user.id"
                                 class="border-b border-border/50 transition-colors hover:bg-muted/30"
                             >
                                 <td class="px-4 py-3">
-                                    <div class="font-medium">{{ product.name }}</div>
-                                    <div v-if="product.description" class="text-xs text-muted-foreground line-clamp-1">
-                                        {{ product.description }}
-                                    </div>
+                                    <div class="font-medium">{{ user.name }}</div>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <Badge variant="outline">{{ categoryLabels[product.category] }}</Badge>
-                                </td>
-                                <td class="px-4 py-3 text-right font-semibold">{{ formatCurrency(product.price) }}</td>
-                                <td class="px-4 py-3 text-center">
-                                    <span
-                                        :class="[
-                                            'inline-flex h-6 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold',
-                                            product.total_stock > 5
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : product.total_stock > 0
-                                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                        ]"
-                                    >
-                                        {{ product.total_stock }}
-                                    </span>
+                                <td class="px-4 py-3 text-muted-foreground">
+                                    {{ user.email }}
                                 </td>
                                 <td class="px-4 py-3 text-center">
-                                    <Badge :variant="product.is_active ? 'default' : 'secondary'">
-                                        {{ product.is_active ? 'Activo' : 'Inactivo' }}
+                                    <Badge variant="outline">{{ user.role }}</Badge>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <Badge :variant="user.status === '1' ? 'default' : 'secondary'">
+                                        {{ user.status === '1' ? 'Activo' : 'Inactivo' }}
                                     </Badge>
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-1">
-                                        <Link :href="`/admin/products/${product.id}/edit`">
+                                        <Link :href="`/admin/users/${user.id}/edit`">
                                             <Button variant="ghost" size="icon" title="Editar">
                                                 <Pencil class="h-4 w-4" />
                                             </Button>
                                         </Link>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Eliminar"
-                                            class="text-destructive hover:text-destructive"
-                                            @click="deleteProduct(product.id)"
-                                        >
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
                                     </div>
                                 </td>
                             </tr>
@@ -202,12 +168,12 @@ function clearFilters() {
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="products.last_page > 1" class="flex items-center justify-between border-t border-border px-4 py-3">
+                <div v-if="users.last_page > 1" class="flex items-center justify-between border-t border-border px-4 py-3">
                     <p class="text-sm text-muted-foreground">
-                        Mostrando {{ products.from }}–{{ products.to }} de {{ products.total }}
+                        Mostrando {{ users.from }}–{{ users.to }} de {{ users.total }}
                     </p>
                     <div class="flex items-center gap-1">
-                        <template v-for="link in products.links" :key="link.label">
+                        <template v-for="link in users.links" :key="link.label">
                             <Link v-if="link.url" :href="link.url" preserve-scroll>
                                 <Button
                                     variant="outline"

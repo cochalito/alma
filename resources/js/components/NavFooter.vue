@@ -32,8 +32,9 @@ defineProps<Props>();
                             :href="toUrl(item.href)"
                             target="_blank"
                             rel="noopener noreferrer"
+                            class="flex items-center gap-2"
                         >
-                            <component :is="item.icon" />
+                            <component v-if="item.icon" :is="item.icon" class="h-4 w-4" />
                             <span>{{ item.title }}</span>
                         </a>
                     </SidebarMenuButton>

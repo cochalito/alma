@@ -73,7 +73,7 @@ class ReservationController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'employee_id' => 'required|exists:users,id',
             'departament_id' => 'required|exists:departament,id',
             'customer_id' => 'required|exists:customers,id',
@@ -92,19 +92,63 @@ class ReservationController extends Controller
             'products.*.subtotal' => 'required|numeric|min:0',
         ]);
 
-        $reservation = Reservation::create($validated);
+        $validator->after(function ($validator) use ($request) {
+            $overlapping = Reservation::where('departament_id', $request->departament_id)
+                ->where('status', '!=', '4')
+                ->where(function ($query) use ($request) {
+                    $query->where('check_in', '<', $request->check_out)
+                        ->where('check_out', '>', $request->check_in);
+                })
+                ->exists();
 
-        if ($request->has('products')) {
-            $syncData = [];
-            foreach ($request->input('products', []) as $product) {
-                $syncData[$product['product_id']] = [
-                    'quantity' => $product['quantity'],
-                    'unit_price' => $product['unit_price'],
-                    'subtotal' => $product['subtotal'],
-                ];
+            if ($overlapping) {
+                $validator->errors()->add('departament_id', 'Este departamento ya cuenta con una reservación cruzada en estas fechas.');
             }
-            $reservation->products()->sync($syncData);
-        }
+        });
+
+        $validated = $validator->validate();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request, &$reservation) {
+            $reservation = Reservation::create($validated);
+
+            if ($request->has('products')) {
+                $syncData = [];
+                foreach ($request->input('products', []) as $product) {
+                    $qty = $product['quantity'];
+                    $syncData[$product['product_id']] = [
+                        'quantity' => $qty,
+                        'unit_price' => $product['unit_price'],
+                        'subtotal' => $product['subtotal'],
+                    ];
+
+                    // Reduce Stock and Create Movement
+                    $locationRecord = \App\Models\ProductLocation::where('product_id', $product['product_id'])
+                        ->where('location', $reservation->location)
+                        ->first();
+
+                    if ($locationRecord) {
+                        $locationRecord->decrement('stock', $qty);
+                    } else {
+                        \App\Models\ProductLocation::create([
+                            'product_id' => $product['product_id'],
+                            'location' => $reservation->location,
+                            'stock' => -$qty
+                        ]);
+                    }
+
+                    \App\Models\InventoryMovement::create([
+                        'product_id' => $product['product_id'],
+                        'location' => $reservation->location,
+                        'type' => 'out',
+                        'quantity' => $qty,
+                        'user_id' => auth()->id() ?? 1,
+                        'reservation_id' => $reservation->id,
+                        'description' => 'Consumo en reserva',
+                    ]);
+                }
+                $reservation->products()->sync($syncData);
+            }
+        });
 
         return back()->with('success', 'Reservación creada exitosamente.');
     }
@@ -131,7 +175,7 @@ class ReservationController extends Controller
 
     public function update(Request $request, Reservation $reservation)
     {
-        $validated = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'employee_id' => 'required|exists:users,id',
             'departament_id' => 'required|exists:departament,id',
             'customer_id' => 'required|exists:customers,id',
@@ -150,19 +194,88 @@ class ReservationController extends Controller
             'products.*.subtotal' => 'required|numeric|min:0',
         ]);
 
-        $reservation->update($validated);
+        $validator->after(function ($validator) use ($request, $reservation) {
+            $overlapping = Reservation::where('departament_id', $request->departament_id)
+                ->where('id', '!=', $reservation->id)
+                ->where('status', '!=', '4')
+                ->where(function ($query) use ($request) {
+                    $query->where('check_in', '<', $request->check_out)
+                        ->where('check_out', '>', $request->check_in);
+                })
+                ->exists();
 
-        if ($request->has('products')) {
-            $syncData = [];
-            foreach ($request->input('products', []) as $product) {
-                $syncData[$product['product_id']] = [
-                    'quantity' => $product['quantity'],
-                    'unit_price' => $product['unit_price'],
-                    'subtotal' => $product['subtotal'],
-                ];
+            if ($overlapping) {
+                $validator->errors()->add('departament_id', 'Este departamento ya cuenta con una reservación cruzada para las mismas fechas editadas.');
             }
-            $reservation->products()->sync($syncData);
-        }
+        });
+
+        $validated = $validator->validate();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request, $reservation) {
+            $oldLocation = $reservation->location;
+            $oldProducts = $reservation->products()->get();
+
+            $reservation->update($validated);
+            $newLocation = $reservation->location;
+
+            if ($request->has('products')) {
+                $syncData = [];
+                $newProductsList = $request->input('products', []);
+
+                // We'll manage stock differences
+                // First, return all old stock to the OLD location because the reservation could have changed location entirely
+                foreach ($oldProducts as $oldP) {
+                    $qty = $oldP->pivot->quantity;
+
+                    $locRecord = \App\Models\ProductLocation::where('product_id', $oldP->id)->where('location', $oldLocation)->first();
+                    if ($locRecord)
+                        $locRecord->increment('stock', $qty);
+
+                    \App\Models\InventoryMovement::create([
+                        'product_id' => $oldP->id,
+                        'location' => $oldLocation,
+                        'type' => 'in',
+                        'quantity' => $qty,
+                        'user_id' => auth()->id() ?? 1,
+                        'reservation_id' => $reservation->id,
+                        'description' => 'Reversión por edición de reserva',
+                    ]);
+                }
+
+                // Now, consume stock from the NEW location with the NEW quantities
+                foreach ($newProductsList as $product) {
+                    $qty = $product['quantity'];
+                    $syncData[$product['product_id']] = [
+                        'quantity' => $qty,
+                        'unit_price' => $product['unit_price'],
+                        'subtotal' => $product['subtotal'],
+                    ];
+
+                    $locRecord = \App\Models\ProductLocation::where('product_id', $product['product_id'])->where('location', $newLocation)->first();
+                    if ($locRecord) {
+                        $locRecord->decrement('stock', $qty);
+                    } else {
+                        \App\Models\ProductLocation::create([
+                            'product_id' => $product['product_id'],
+                            'location' => $newLocation,
+                            'stock' => -$qty
+                        ]);
+                    }
+
+                    \App\Models\InventoryMovement::create([
+                        'product_id' => $product['product_id'],
+                        'location' => $newLocation,
+                        'type' => 'out',
+                        'quantity' => $qty,
+                        'user_id' => auth()->id() ?? 1,
+                        'reservation_id' => $reservation->id,
+                        'description' => 'Consumo en reserva (editada)',
+                    ]);
+                }
+
+                $reservation->products()->sync($syncData);
+            }
+        });
 
         return back()->with('success', 'Reservación actualizada exitosamente.');
     }

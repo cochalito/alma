@@ -236,14 +236,12 @@ const chartOptions = computed(() => ({
                         <h3 class="text-lg font-bold text-slate-800 dark:text-white">Flujo de Reservas (Últimos 10 días)</h3>
                     </div>
                     <div class="mt-4 w-full" style="min-height: 350px;">
-                        <ClientOnly>
                             <VueApexCharts
                                 type="area"
                                 height="350"
                                 :options="chartOptions"
                                 :series="props.chartData.series"
                             ></VueApexCharts>
-                        </ClientOnly>
                     </div>
                 </div>
 

@@ -63,6 +63,22 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')->with('success', 'Huésped creado exitosamente.');
     }
 
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'firstname' => 'required|string|max:255',
+            'lastname' => 'required|string|max:255',
+            'email' => 'required|email|max:150',
+            'cellphone' => 'nullable|string|max:50',
+            'document_number' => 'nullable|string|max:255',
+        ]);
+        $validated['status'] = '1';
+
+        $customer = Customer::create($validated);
+
+        return response()->json(['customer' => $customer]);
+    }
+
     public function edit(Customer $customer)
     {
         return Inertia::render('Admin/Customers/Edit', [

@@ -12,5 +12,6 @@ class Departament extends Model
         'location',
         'code',
         'status',
+        'cost',
     ];
 }

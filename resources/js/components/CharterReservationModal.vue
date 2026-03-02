@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
-import { type Reservation, type Departament, type User, type Product, type Customer } from '@/types';
+import { ref, watch, computed } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
+import { type Reservation, type Departament, type User, type Product, type Customer, type AppPageProps } from '@/types';
+import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,78 @@ const formatForInput = (dateStr: string) => {
     if (!dateStr) return '';
     return dateStr.replace(' ', 'T').slice(0, 16);
 };
+
+const page = usePage<AppPageProps>();
+
+const localCustomers = ref<Customer[]>([...props.customers]);
+
+const customerSearch = ref('');
+const showCustomerDropdown = ref(false);
+
+const filteredCustomers = computed(() => {
+    let sorted = [...localCustomers.value].sort((a, b) =>
+        (a.firstname + ' ' + a.lastname).localeCompare(b.firstname + ' ' + b.lastname)
+    );
+    if (!customerSearch.value) return sorted.slice(0, 50);
+    const s = customerSearch.value.toLowerCase();
+    return sorted.filter(c =>
+        (c.firstname + ' ' + c.lastname).toLowerCase().includes(s) ||
+        (c.document_number || '').toLowerCase().includes(s)
+    ).slice(0, 50);
+});
+
+const selectedCustomerDisplay = computed(() => {
+    if (!form.customer_id) return '';
+    const c = localCustomers.value.find(c => c.id === form.customer_id);
+    return c ? `${c.firstname} ${c.lastname} — ${c.document_number ?? 'S/D'}` : '';
+});
+
+function selectCustomer(id: number) {
+    form.customer_id = id;
+    showCustomerDropdown.value = false;
+    customerSearch.value = '';
+}
+
+function handleCustomerBlur() {
+    window.setTimeout(() => {
+        showCustomerDropdown.value = false;
+    }, 200);
+}
+
+// Quick create customer
+const isAddingCustomer = ref(false);
+const qcSaving = ref(false);
+const qcErrors = ref<any>({});
+const qcForm = ref({
+    firstname: '',
+    lastname: '',
+    email: '',
+    document_number: '',
+});
+
+function cancelAddCustomer() {
+    isAddingCustomer.value = false;
+    qcForm.value = { firstname: '', lastname: '', email: '', document_number: '' };
+    qcErrors.value = {};
+}
+
+async function saveQuickCustomer() {
+    qcErrors.value = {};
+    qcSaving.value = true;
+    try {
+        const response = await axios.post('/admin/customers/quick', qcForm.value);
+        const newCustomer = response.data.customer;
+        localCustomers.value.push(newCustomer);
+        form.customer_id = newCustomer.id;
+        cancelAddCustomer();
+    } catch (e: any) {
+        if (e.response && e.response.status === 422) {
+            qcErrors.value = e.response.data.errors;
+        }
+    } finally {
+        qcSaving.value = false;
+    }
+}
 
 const form = useForm({
     employee_id: null as number | null,
@@ -113,11 +186,43 @@ watch([() => props.reservation, () => props.open], ([newVal, isOpen]) => {
         } else {
             form.reset();
             form.location = props.defaultLocation;
+            form.employee_id = page.props.auth.user.id;
             form.products = [];
+            localCustomers.value = [...props.customers];
         }
         form.clearErrors();
     }
 }, { immediate: true });
+
+// Automatically set location based on selected department
+watch(() => form.departament_id, (deptId) => {
+    if (deptId) {
+        const dept = props.departments.find(d => d.id === deptId);
+        if (dept) {
+            form.location = dept.location;
+        }
+    }
+});
+
+// Recalculate cost when dates or department change
+watch([() => form.departament_id, () => form.check_in, () => form.check_out], ([deptId, checkIn, checkOut]) => {
+    // Only auto-calc if creating a new reservation or if actively changing fields, though to keep it simple we always calc if valid values.
+    if (!deptId || !checkIn || !checkOut) return;
+
+    const dept = props.departments.find(d => d.id === deptId);
+    if (!dept || !dept.cost) return; // If dept doesn't have a suggested cost, we don't overwrite
+
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+
+    // Calculate nights difference
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        form.total_stay_cost = Number((diffDays * dept.cost).toFixed(2));
+    }
+});
 
 function closeDialog() {
     emit('update:open', false);
@@ -160,24 +265,77 @@ function submit() {
             <form @submit.prevent="submit" class="space-y-6 py-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" v-if="!reservation">
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-sm font-medium">Huésped <span class="text-destructive">*</span></label>
-                        <select v-model="form.customer_id" class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" required>
-                            <option :value="null" disabled>Seleccionar huésped...</option>
-                            <option v-for="c in customers" :key="c.id" :value="c.id">
-                                {{ c.firstname }} {{ c.lastname }} — {{ c.document_number ?? 'S/D' }}
-                            </option>
-                        </select>
-                        <p v-if="form.errors.customer_id" class="text-xs text-destructive">{{ form.errors.customer_id }}</p>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-medium">Huésped <span class="text-destructive">*</span></label>
+                            <Button v-if="!isAddingCustomer" type="button" variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="isAddingCustomer = true">
+                                <Plus class="h-3 w-3 mr-1" /> Nuevo
+                            </Button>
+                        </div>
+
+                        <div v-if="isAddingCustomer" class="p-3 border rounded-lg bg-muted/20 space-y-3">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Input v-model="qcForm.firstname" placeholder="Nombre *" class="h-8 text-xs" />
+                                    <p v-if="qcErrors.firstname" class="text-[10px] text-destructive mt-0.5">{{ qcErrors.firstname[0] }}</p>
+                                </div>
+                                <div>
+                                    <Input v-model="qcForm.lastname" placeholder="Apellido *" class="h-8 text-xs" />
+                                    <p v-if="qcErrors.lastname" class="text-[10px] text-destructive mt-0.5">{{ qcErrors.lastname[0] }}</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Input v-model="qcForm.document_number" placeholder="Documento" class="h-8 text-xs" />
+                                </div>
+                                <div>
+                                    <Input v-model="qcForm.email" type="email" placeholder="Correo *" class="h-8 text-xs" />
+                                    <p v-if="qcErrors.email" class="text-[10px] text-destructive mt-0.5">{{ qcErrors.email[0] }}</p>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-2">
+                                <Button type="button" variant="ghost" size="sm" class="h-7 text-xs" @click="cancelAddCustomer">Cancelar</Button>
+                                <Button type="button" size="sm" class="h-7 text-xs" :disabled="qcSaving" @click="saveQuickCustomer">
+                                    {{ qcSaving ? '...' : 'Revisar y añadir' }}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div v-else class="relative">
+                            <Input
+                                v-if="showCustomerDropdown || !form.customer_id"
+                                v-model="customerSearch"
+                                placeholder="Buscar huésped..."
+                                class="h-10 text-sm"
+                                @focus="showCustomerDropdown = true"
+                                @blur="handleCustomerBlur"
+                            />
+                            <div v-else class="flex items-center justify-between border border-input bg-background px-3 py-2 rounded-lg text-sm cursor-pointer h-10 hover:bg-muted/30" @click="showCustomerDropdown = true">
+                                <span class="truncate font-medium">{{ selectedCustomerDisplay }}</span>
+                                <span class="text-[10px] uppercase text-muted-foreground ml-2 px-2 py-0.5 bg-muted rounded-full">Cambiar</span>
+                            </div>
+
+                            <div v-if="showCustomerDropdown" class="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto">
+                                <div v-if="filteredCustomers.length === 0" class="p-3 text-sm text-center text-muted-foreground">
+                                    No se encontraron resultados
+                                </div>
+                                <div
+                                    v-for="c in filteredCustomers"
+                                    :key="c.id"
+                                    @click="selectCustomer(c.id)"
+                                    class="px-3 py-2 text-sm cursor-pointer hover:bg-muted border-b border-border/30 last:border-0"
+                                >
+                                    <div class="font-medium">{{ c.firstname }} {{ c.lastname }}</div>
+                                    <div class="text-[10px] text-muted-foreground">{{ c.document_number ?? 'S/D' }}</div>
+                                </div>
+                            </div>
+
+                            <p v-if="form.errors.customer_id" class="text-xs text-destructive mt-1">{{ form.errors.customer_id }}</p>
+                        </div>
                     </div>
 
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-sm font-medium">Atendido por <span class="text-destructive">*</span></label>
-                        <select v-model="form.employee_id" class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" required>
-                            <option :value="null" disabled>Seleccionar empleado...</option>
-                            <option v-for="e in employees" :key="e.id" :value="e.id">
-                                {{ e.name }}
-                            </option>
-                        </select>
+                        <label class="text-sm font-medium">Atendido por</label>
+                        <Input :model-value="page.props.auth.user.name" readonly tabindex="-1" class="bg-muted font-medium" />
                         <p v-if="form.errors.employee_id" class="text-xs text-destructive">{{ form.errors.employee_id }}</p>
                     </div>
                 </div>
@@ -236,6 +394,18 @@ function submit() {
                     </div>
                 </div>
 
+                <div class="flex justify-end mt-2 mb-2">
+                    <div class="w-full sm:w-80">
+                        <div class="flex justify-between items-center text-sm gap-4">
+                            <label class="font-medium text-right flex-1">Costo de Estadía (Bs.) <span class="text-destructive">*</span></label>
+                            <div class="w-32 shrink-0">
+                                <Input v-model="form.total_stay_cost" type="number" step="0.01" required class="h-9 text-right font-bold text-primary" />
+                            </div>
+                        </div>
+                        <p v-if="form.errors.total_stay_cost" class="text-xs text-destructive text-right mt-1">{{ form.errors.total_stay_cost }}</p>
+                    </div>
+                </div>
+
                 <div class="space-y-4">
                     <h3 class="text-sm font-semibold border-b pb-1">Productos y Costos Extras</h3>
 
@@ -273,8 +443,8 @@ function submit() {
                                 <tr v-for="(item, index) in form.products" :key="index" class="border-b border-border/50 last:border-0 hover:bg-muted/20">
                                     <td class="py-2 px-3 font-medium">{{ item.name }}</td>
                                     <td class="py-2 px-3 text-center">{{ item.quantity }}</td>
-                                    <td class="py-2 px-3 text-right">Bs. {{ item.unit_price }}</td>
-                                    <td class="py-2 px-3 text-right">Bs. {{ item.subtotal.toFixed(2) }}</td>
+                                    <td class="py-2 px-3 text-right">Bs. {{ Number(item.unit_price).toFixed(2) }}</td>
+                                    <td class="py-2 px-3 text-right">Bs. {{ Number(item.subtotal).toFixed(2) }}</td>
                                     <td class="py-2 px-2 text-center">
                                         <button type="button" @click="removeProduct(index)" class="text-destructive hover:opacity-70 p-1">
                                             <Trash2 class="h-3 w-3" />
@@ -287,21 +457,17 @@ function submit() {
 
                     <div class="flex justify-end pt-5 border-t border-border/50 mt-4">
                         <div class="w-full sm:w-80 space-y-3 bg-muted/10 p-4 rounded-lg border border-border/50">
+                            <!-- Extras below table -->
                             <div class="flex justify-between items-center text-sm gap-4">
-                                <span class="font-medium text-muted-foreground text-right flex-1">Costo de Estadía:</span>
+                                <span class="font-medium text-muted-foreground text-right flex-1">Costos Extras:</span>
                                 <div class="w-32 shrink-0">
-                                    <Input v-model="form.total_stay_cost" type="number" step="0.01" required class="h-8 text-right font-medium" />
+                                    <Input :model-value="form.total_extra_cost" readonly tabindex="-1" class="h-8 text-right font-medium bg-muted opacity-80" />
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center text-sm gap-4">
-                                <span class="font-medium text-muted-foreground text-right flex-1">Costos Extras Totales:</span>
-                                <div class="w-32 shrink-0 relative">
-                                    <Input v-model="form.total_extra_cost" type="number" step="0.01" required :readonly="form.products.length > 0" class="h-8 text-right font-medium" :class="{'bg-muted/30': form.products.length > 0}" />
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center text-base font-bold text-primary pt-3 border-t border-border/50 gap-4">
-                                <span class="text-right flex-1 uppercase tracking-wider text-xs">Costo Total (Bs.)</span>
-                                <span class="w-32 text-right shrink-0 text-xl">{{ (Number(form.total_stay_cost) + Number(form.total_extra_cost)).toFixed(2) }}</span>
+                            <!-- Grand Total -->
+                            <div class="flex justify-between items-center text-lg font-bold text-primary pt-3 border-t border-border/50 gap-4">
+                                <span class="text-right flex-1 uppercase tracking-wider text-sm whitespace-nowrap">Costo Total</span>
+                                <span class="w-32 text-right shrink-0">Bs. {{ (Number(form.total_stay_cost) + Number(form.total_extra_cost)).toFixed(2) }}</span>
                             </div>
                         </div>
                     </div>

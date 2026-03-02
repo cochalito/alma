@@ -28,8 +28,8 @@ const page = usePage();
                     :is-active="urlIsActive(item.href, page.url)"
                     :tooltip="item.title"
                 >
-                    <Link :href="item.href">
-                        <component :is="item.icon" />
+                    <Link :href="item.href" class="flex items-center gap-2">
+                        <component v-if="item.icon" :is="item.icon" class="h-4 w-4" />
                         <span>{{ item.title }}</span>
                     </Link>
                 </SidebarMenuButton>

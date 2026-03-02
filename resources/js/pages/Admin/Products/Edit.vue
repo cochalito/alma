@@ -7,7 +7,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ChevronLeft, Package, Save } from 'lucide-vue-next';
 
 interface Props {
-    product: Product;
+    product: Product & { locations?: { location: string; stock: number }[] };
+    locations: string[];
 }
 
 const props = defineProps<Props>();
@@ -18,14 +19,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: `Editar: ${props.product.name}`, href: '#' },
 ];
 
-const form = useForm({
+const initialFormState: Record<string, any> = {
     name: props.product.name,
     description: props.product.description ?? '',
     category: props.product.category,
     price: String(props.product.price),
-    stock: String(props.product.stock),
     is_active: props.product.is_active,
+};
+
+props.locations.forEach(loc => {
+    const locData = props.product.locations?.find((l: any) => l.location === loc);
+    initialFormState['stock_' + loc] = locData ? locData.stock : 0;
 });
+
+const form = useForm(initialFormState);
 
 function submit() {
     form.put(`/admin/products/${props.product.id}`);
@@ -115,17 +122,21 @@ function submit() {
                             </div>
 
                             <!-- Stock -->
-                            <div class="space-y-1.5">
-                                <label class="text-sm font-medium">Stock disponible *</label>
-                                <Input
-                                    v-model="form.stock"
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    class="max-w-[200px]"
-                                    required
-                                />
-                                <p v-if="form.errors.stock" class="text-xs text-destructive">{{ form.errors.stock }}</p>
+                            <div class="space-y-4 pt-2">
+                                <h3 class="text-sm font-semibold">Stock por Sucursal *</h3>
+                                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div v-for="loc in locations" :key="loc" class="space-y-1.5">
+                                        <label class="text-xs font-medium">{{ loc }}</label>
+                                        <Input
+                                            v-model="form['stock_' + loc]"
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            required
+                                        />
+                                        <p v-if="form.errors['stock_' + loc]" class="text-xs text-destructive">{{ form.errors['stock_' + loc] }}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
