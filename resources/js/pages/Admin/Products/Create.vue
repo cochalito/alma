@@ -24,11 +24,6 @@ const initialFormState: Record<string, any> = {
     is_active: true,
 };
 
-// Add stock fields recursively
-props.locations.forEach(loc => {
-    initialFormState['stock_' + loc] = 0;
-});
-
 const form = useForm(initialFormState);
 
 function submit() {
@@ -42,7 +37,7 @@ function submit() {
         <div class="flex flex-col gap-6 p-6">
 
             <!-- Header -->
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 font-outfit">
                 <Link href="/admin/products">
                     <Button variant="ghost" size="icon">
                         <ChevronLeft class="h-5 w-5" />
@@ -54,7 +49,7 @@ function submit() {
                     </div>
                     <div>
                         <h1 class="text-2xl font-bold tracking-tight">Nuevo Producto</h1>
-                        <p class="text-sm text-muted-foreground">Agrega un producto al minibar</p>
+                        <p class="text-sm text-muted-foreground">Agrega los datos básicos del producto</p>
                     </div>
                 </div>
             </div>
@@ -105,7 +100,7 @@ function submit() {
                                 </div>
 
                                 <div class="space-y-1.5">
-                                    <label class="text-sm font-medium">Precio (USD) *</label>
+                                    <label class="text-sm font-medium">Precio (Bs.) *</label>
                                     <Input
                                         v-model="form.price"
                                         type="number"
@@ -117,24 +112,6 @@ function submit() {
                                     <p v-if="form.errors.price" class="text-xs text-destructive">{{ form.errors.price }}</p>
                                 </div>
                             </div>
-
-                            <!-- Stock -->
-                            <div class="space-y-4 pt-2">
-                                <h3 class="text-sm font-semibold">Stock Inicial por Sucursal *</h3>
-                                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    <div v-for="loc in locations" :key="loc" class="space-y-1.5">
-                                        <label class="text-xs font-medium">{{ loc }}</label>
-                                        <Input
-                                            v-model="form['stock_' + loc]"
-                                            type="number"
-                                            min="0"
-                                            placeholder="0"
-                                            required
-                                        />
-                                        <p v-if="form.errors['stock_' + loc]" class="text-xs text-destructive">{{ form.errors['stock_' + loc] }}</p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -142,7 +119,7 @@ function submit() {
                     <div class="space-y-4">
                         <!-- Estado -->
                         <div class="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
-                            <h2 class="text-base font-semibold">Publicación</h2>
+                            <h2 class="text-base font-semibold">Estado</h2>
                             <label class="flex items-center gap-3 cursor-pointer">
                                 <div class="relative">
                                     <input type="checkbox" class="sr-only" v-model="form.is_active" />
@@ -160,7 +137,7 @@ function submit() {
                                 </span>
                             </label>
                             <p class="text-xs text-muted-foreground">
-                                Los productos inactivos no aparecen en el listado de reservas.
+                                Los productos inactivos no aparecerán para nuevas asignaciones.
                             </p>
                         </div>
 
@@ -168,7 +145,7 @@ function submit() {
                         <div class="rounded-xl border border-border bg-card p-6 shadow-sm">
                             <h2 class="mb-4 text-base font-semibold">Acciones</h2>
                             <div class="flex flex-col gap-2">
-                                <Button type="submit" :disabled="form.processing" class="w-full">
+                                <Button type="submit" :disabled="form.processing" class="w-full font-bold">
                                     <Save class="mr-2 h-4 w-4" />
                                     {{ form.processing ? 'Guardando...' : 'Crear Producto' }}
                                 </Button>

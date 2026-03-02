@@ -61,6 +61,8 @@ interface Props {
 const props = defineProps<Props>();
 
 import { computed } from 'vue';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 function getStatusConfig(status: string) {
     switch (status) {
@@ -79,6 +81,18 @@ const formatDateTime = (dateStr: string) => {
         return `${match[3]}/${match[2]}/${match[1]} ${match[4]}`;
     }
     return dateStr;
+};
+
+const getRelativeTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        // Ensure valid date
+        if (isNaN(date.getTime())) return 'Hace momento';
+        return formatDistanceToNow(date, { addSuffix: true, locale: es });
+    } catch (e) {
+        return 'Hace momento';
+    }
 };
 
 const dashboardStats = computed(() => [
@@ -285,8 +299,8 @@ const chartOptions = computed(() => ({
                                         Bs. {{ Number(res.total_cost).toFixed(2) }}
                                     </td>
                                     <td class="py-3 px-4 align-top whitespace-nowrap">
-                                        <div class="text-xs font-semibold">Hace momento</div>
-                                        <div class="text-[10px] text-muted-foreground mt-0.5">{{ res.updated_at }}</div>
+                                        <div class="text-xs font-semibold capitalize">{{ getRelativeTime(res.updated_at) }}</div>
+                                        <div class="text-[10px] text-muted-foreground mt-0.5" :title="res.updated_at">{{ new Date(res.updated_at).toLocaleString('es-BO', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'}) }}</div>
                                     </td>
                                 </tr>
                             </tbody>

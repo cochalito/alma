@@ -148,6 +148,41 @@ class ReservationController extends Controller
                 }
                 $reservation->products()->sync($syncData);
             }
+
+            // Post-creation state
+            $refreshed = $reservation->fresh();
+            $newDataToTrack = $refreshed->toArray();
+            $newDataToTrack['products'] = $refreshed->products()->get()->map(function ($p) {
+                return [
+                    'product_id' => $p->id,
+                    'name' => $p->name,
+                    'quantity' => $p->pivot->quantity,
+                    'unit_price' => $p->pivot->unit_price,
+                    'subtotal' => $p->pivot->subtotal,
+                ];
+            })->toArray();
+
+            $diff = [];
+            $trackableFields = ['employee_id', 'departament_id', 'customer_id', 'location', 'check_in', 'check_out', 'total_stay_cost', 'total_extra_cost', 'requests', 'comments', 'status'];
+            foreach ($trackableFields as $field) {
+                $diff[$field] = [
+                    'old' => null,
+                    'new' => $newDataToTrack[$field],
+                ];
+            }
+            if (count($newDataToTrack['products']) > 0) {
+                $diff['products'] = [
+                    'old' => [],
+                    'new' => $newDataToTrack['products'],
+                ];
+            }
+
+            \App\Models\ReservationHistory::create([
+                'reservation_id' => $reservation->id,
+                'user_id' => auth()->id() ?? 1,
+                'action' => 'created',
+                'changes' => $diff
+            ]);
         });
 
         return back()->with('success', 'Reservación creada exitosamente.');
@@ -215,6 +250,18 @@ class ReservationController extends Controller
             $oldLocation = $reservation->location;
             $oldProducts = $reservation->products()->get();
 
+            // Track state for history
+            $oldDataToTrack = $reservation->toArray();
+            $oldDataToTrack['products'] = $oldProducts->map(function ($p) {
+                return [
+                    'product_id' => $p->id,
+                    'name' => $p->name,
+                    'quantity' => $p->pivot->quantity,
+                    'unit_price' => $p->pivot->unit_price,
+                    'subtotal' => $p->pivot->subtotal,
+                ];
+            })->toArray();
+
             $reservation->update($validated);
             $newLocation = $reservation->location;
 
@@ -274,6 +321,49 @@ class ReservationController extends Controller
                 }
 
                 $reservation->products()->sync($syncData);
+            }
+
+            // Post-update state
+            $refreshed = $reservation->fresh();
+            $newDataToTrack = $refreshed->toArray();
+            $newDataToTrack['products'] = $refreshed->products()->get()->map(function ($p) {
+                return [
+                    'product_id' => $p->id,
+                    'name' => $p->name,
+                    'quantity' => $p->pivot->quantity,
+                    'unit_price' => $p->pivot->unit_price,
+                    'subtotal' => $p->pivot->subtotal,
+                ];
+            })->toArray();
+
+            // Identify changes
+            $diff = [];
+            $trackableFields = ['employee_id', 'departament_id', 'customer_id', 'location', 'check_in', 'check_out', 'total_stay_cost', 'total_extra_cost', 'requests', 'comments', 'status'];
+            foreach ($trackableFields as $field) {
+                if ($oldDataToTrack[$field] != $newDataToTrack[$field]) {
+                    $diff[$field] = [
+                        'old' => $oldDataToTrack[$field],
+                        'new' => $newDataToTrack[$field],
+                    ];
+                }
+            }
+
+            // Check if products changed
+            if (json_encode($oldDataToTrack['products']) !== json_encode($newDataToTrack['products'])) {
+                $diff['products'] = [
+                    'old' => $oldDataToTrack['products'],
+                    'new' => $newDataToTrack['products'],
+                ];
+            }
+
+            // Save history if there are changes
+            if (!empty($diff)) {
+                \App\Models\ReservationHistory::create([
+                    'reservation_id' => $reservation->id,
+                    'user_id' => auth()->id() ?? 1,
+                    'action' => 'updated',
+                    'changes' => $diff
+                ]);
             }
         });
 

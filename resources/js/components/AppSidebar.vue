@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -18,9 +17,7 @@ import {
     LayoutDashboard,
     CalendarDays,
     Users,
-    Settings,
     Activity,
-    HelpCircle,
     Coffee,
     Ship,
     FileText,
@@ -73,7 +70,7 @@ const reportItems: NavItem[] = [
     },
     {
         title: 'Reporte de Actividad',
-        href: '#',
+        href: '/admin/reports/activity',
         icon: Activity,
     },
 ];
@@ -88,19 +85,6 @@ const adminItems: NavItem[] = [
         title: 'Departamentos',
         href: '/admin/departaments',
         icon: Building,
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Configuración',
-        href: '#',
-        icon: Settings,
-    },
-    {
-        title: 'Ayuda y Soporte',
-        href: '#',
-        icon: HelpCircle,
     },
 ];
 </script>
@@ -127,7 +111,6 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

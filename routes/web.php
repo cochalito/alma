@@ -69,7 +69,7 @@ Route::get('dashboard', function () {
                 'check_out' => $res->check_out,
                 'total_cost' => $res->total_stay_cost + $res->total_extra_cost,
                 'status' => $res->status,
-                'updated_at' => $res->updated_at->diffForHumans(),
+                'updated_at' => $res->updated_at->toIso8601String(),
             ];
         });
 
@@ -133,11 +133,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
     Route::resource('departaments', \App\Http\Controllers\DepartamentController::class);
     Route::post('customers/quick', [CustomerController::class, 'quickStore'])->name('customers.quick');
     Route::resource('customers', CustomerController::class);
+    Route::post('products/stock-adjustment', [ProductController::class, 'stockAdjustment'])->name('products.stock-adjustment');
     Route::resource('products', ProductController::class);
     Route::resource('reservations', ReservationController::class);
     Route::get('charter', [CharterController::class, 'index'])->name('charter.index');
     Route::get('reports/reservations', [\App\Http\Controllers\ReportController::class, 'reservations'])->name('reports.reservations');
     Route::get('reports/kardex', [\App\Http\Controllers\ReportController::class, 'kardex'])->name('reports.kardex');
+    Route::get('reports/activity', [\App\Http\Controllers\ReportController::class, 'activity'])->name('reports.activity');
 });
 
 require __DIR__ . '/settings.php';

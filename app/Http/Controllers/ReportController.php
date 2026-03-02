@@ -53,7 +53,7 @@ class ReportController extends Controller
         });
 
         // Get reservations matching timeframe
-        $revenueQuery = Reservation::where('status', '!=', '4') // Not cancelled
+        $revenueQuery = Reservation::where('status', '3') // Only Check Out
             ->whereDate('check_out', '>=', $startMonth);
 
         if ($location !== 'AMBOS') {
@@ -154,20 +154,70 @@ class ReportController extends Controller
     {
         $productId = $request->query('product_id');
         $location = $request->query('location');
+        $period = $request->query('period', 'month');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
 
         $products = \App\Models\Product::orderBy('name')->get();
         $locations = Departament::select('location')->distinct()->pluck('location');
 
         $movements = null;
         $product = null;
+        $initialBalance = 0;
         $currentStock = 0;
+
+        $filters = [
+            'product_id' => $productId,
+            'location' => $location,
+            'period' => $period,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo
+        ];
 
         if ($productId && $location) {
             $product = \App\Models\Product::find($productId);
-            $query = \App\Models\InventoryMovement::with(['user', 'reservation.customer'])
-                ->where('product_id', $productId)
-                ->where('location', $location)
-                ->orderBy('created_at', 'asc');
+
+            $startDate = null;
+            $endDate = null;
+
+            if ($period === 'month') {
+                $startDate = Carbon::now()->startOfMonth();
+                $endDate = Carbon::now()->endOfMonth();
+            } elseif ($period === 'year') {
+                $startDate = Carbon::now()->startOfYear();
+                $endDate = Carbon::now()->endOfYear();
+            } elseif ($period === 'custom' && $dateFrom && $dateTo) {
+                $startDate = Carbon::parse($dateFrom)->startOfDay();
+                $endDate = Carbon::parse($dateTo)->endOfDay();
+            }
+
+            // Calculate Initial Balance (Movements before startDate)
+            if ($startDate) {
+                $prevIn = \App\Models\InventoryMovement::where('product_id', $productId)
+                    ->where('location', $location)
+                    ->where('type', 'in')
+                    ->where('created_at', '<', $startDate)
+                    ->sum('quantity');
+
+                $prevOut = \App\Models\InventoryMovement::where('product_id', $productId)
+                    ->where('location', $location)
+                    ->where('type', 'out')
+                    ->where('created_at', '<', $startDate)
+                    ->sum('quantity');
+
+                $initialBalance = $prevIn - $prevOut;
+
+                $query = \App\Models\InventoryMovement::with(['user', 'reservation.customer'])
+                    ->where('product_id', $productId)
+                    ->where('location', $location)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->orderBy('created_at', 'asc');
+            } else {
+                $query = \App\Models\InventoryMovement::with(['user', 'reservation.customer'])
+                    ->where('product_id', $productId)
+                    ->where('location', $location)
+                    ->orderBy('created_at', 'asc');
+            }
 
             $movements = $query->get()->map(function ($move) {
                 return [
@@ -191,7 +241,61 @@ class ReportController extends Controller
             'movements' => $movements,
             'selectedProduct' => $product,
             'selectedLocation' => $location,
-            'currentStock' => $currentStock
+            'initialBalance' => (int) $initialBalance,
+            'currentStock' => (int) $currentStock,
+            'filters' => $filters
+        ]);
+    }
+
+    public function activity(Request $request)
+    {
+        $userId = $request->query('user_id');
+        $reservationId = $request->query('reservation_id');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+
+        // Prepare filter data
+        $users = \App\Models\User::orderBy('name')->get();
+        // Since reservations can be many, maybe just get recent or allow searching by ID directly in the frontend.
+        // We'll pass an empty array for reservations dropdown, or maybe pass the last 100 for a combobox.
+        $recentReservations = \App\Models\Reservation::orderBy('id', 'desc')->limit(200)->get()->map(function ($r) {
+            return [
+                'id' => $r->id,
+                'label' => "Rev #" . $r->id . ($r->customer ? " - " . $r->customer->firstname : "")
+            ];
+        });
+
+        $query = \App\Models\ReservationHistory::with(['user', 'reservation.customer'])
+            ->orderBy('created_at', 'desc');
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        if ($reservationId) {
+            $query->where('reservation_id', $reservationId);
+        }
+
+        if ($dateFrom) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $histories = $query->paginate(20)->withQueryString();
+
+        return Inertia::render('Admin/Reports/Activity', [
+            'histories' => $histories,
+            'users' => $users,
+            'recentReservations' => $recentReservations,
+            'filters' => [
+                'user_id' => $userId,
+                'reservation_id' => $reservationId,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]
         ]);
     }
 }

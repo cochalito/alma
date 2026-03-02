@@ -63,125 +63,106 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $locations = Departament::select('location')->distinct()->pluck('location')->toArray();
-        $stockValidation = [];
-        foreach ($locations as $loc) {
-            $stockValidation['stock_' . $loc] = 'required|integer|min:0';
-        }
-
-        $validated = $request->validate(array_merge([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'required|in:1,2,3,4,beverages,snacks,toiletries,other',
+            'category' => 'required|in:beverages,snacks,toiletries,other',
             'price' => 'required|numeric|min:0',
             'is_active' => 'boolean',
-        ], $stockValidation));
+        ]);
 
-        DB::transaction(function () use ($validated, $locations, $request) {
-            $product = Product::create([
-                'name' => $validated['name'],
-                'description' => $validated['description'],
-                'category' => $validated['category'],
-                'price' => $validated['price'],
-                'is_active' => isset($validated['is_active']) ? $validated['is_active'] : true,
+        $product = Product::create([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'category' => $validated['category'],
+            'price' => $validated['price'],
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        // Initialize empty locations if needed
+        $locations = Departament::select('location')->distinct()->pluck('location');
+        foreach ($locations as $loc) {
+            ProductLocation::create([
+                'product_id' => $product->id,
+                'location' => $loc,
+                'stock' => 0
             ]);
-
-            foreach ($locations as $loc) {
-                $stock = $validated['stock_' . $loc];
-                ProductLocation::create([
-                    'product_id' => $product->id,
-                    'location' => $loc,
-                    'stock' => $stock
-                ]);
-
-                if ($stock > 0) {
-                    InventoryMovement::create([
-                        'product_id' => $product->id,
-                        'location' => $loc,
-                        'type' => 'in',
-                        'quantity' => $stock,
-                        'user_id' => auth()->id() ?? 1,
-                        'description' => 'Stock inicial',
-                    ]);
-                }
-            }
-        });
+        }
 
         return redirect()->route('products.index')->with('success', 'Producto creado exitosamente.');
     }
 
     public function edit(Product $product)
     {
-        $locations = Departament::select('location')->distinct()->pluck('location');
-        $product->load('locations');
         return Inertia::render('Admin/Products/Edit', [
             'product' => $product,
-            'locations' => $locations
         ]);
     }
 
     public function update(Request $request, Product $product)
     {
-        $locations = Departament::select('location')->distinct()->pluck('location')->toArray();
-        $stockValidation = [];
-        foreach ($locations as $loc) {
-            $stockValidation['stock_' . $loc] = 'required|integer|min:0';
-        }
-
-        $validated = $request->validate(array_merge([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'required|in:1,2,3,4,beverages,snacks,toiletries,other',
+            'category' => 'required|in:beverages,snacks,toiletries,other',
             'price' => 'required|numeric|min:0',
             'is_active' => 'boolean',
-        ], $stockValidation));
+        ]);
 
-        DB::transaction(function () use ($validated, $locations, $product) {
-            $product->update([
-                'name' => $validated['name'],
-                'description' => $validated['description'],
-                'category' => $validated['category'],
-                'price' => $validated['price'],
-                'is_active' => isset($validated['is_active']) ? $validated['is_active'] : true,
-            ]);
-
-            foreach ($locations as $loc) {
-                $newStock = $validated['stock_' . $loc];
-                $locationRecord = ProductLocation::where('product_id', $product->id)->where('location', $loc)->first();
-
-                $oldStock = $locationRecord ? $locationRecord->stock : 0;
-
-                if (!$locationRecord) {
-                    ProductLocation::create([
-                        'product_id' => $product->id,
-                        'location' => $loc,
-                        'stock' => $newStock
-                    ]);
-                } else {
-                    $locationRecord->update(['stock' => $newStock]);
-                }
-
-                $diff = $newStock - $oldStock;
-                if ($diff != 0) {
-                    InventoryMovement::create([
-                        'product_id' => $product->id,
-                        'location' => $loc,
-                        'type' => $diff > 0 ? 'in' : 'out',
-                        'quantity' => abs($diff),
-                        'user_id' => auth()->id() ?? 1,
-                        'description' => 'Ajuste manual de stock',
-                    ]);
-                }
-            }
-        });
+        $product->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'category' => $validated['category'],
+            'price' => $validated['price'],
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
 
         return redirect()->route('products.index')->with('success', 'Producto actualizado exitosamente.');
     }
 
+    public function stockAdjustment(Request $request)
+    {
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'location' => 'required|string',
+            'type' => 'required|in:in,out',
+            'quantity' => 'required|integer|min:1',
+            'description' => 'nullable|string|required_if:type,out',
+        ], [
+            'description.required_if' => 'La descripción es obligatoria para las bajas (salidas).'
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            $locationRecord = ProductLocation::firstOrCreate(
+                ['product_id' => $validated['product_id'], 'location' => $validated['location']],
+                ['stock' => 0]
+            );
+
+            if ($validated['type'] === 'in') {
+                $locationRecord->increment('stock', $validated['quantity']);
+            } else {
+                if ($locationRecord->stock < $validated['quantity']) {
+                    throw new \Exception("Stock insuficiente en {$validated['location']}.");
+                }
+                $locationRecord->decrement('stock', $validated['quantity']);
+            }
+
+            InventoryMovement::create([
+                'product_id' => $validated['product_id'],
+                'location' => $validated['location'],
+                'type' => $validated['type'],
+                'quantity' => $validated['quantity'],
+                'user_id' => auth()->id(),
+                'description' => $validated['description'] ?? ($validated['type'] === 'in' ? 'Alta de stock' : 'Baja de stock'),
+            ]);
+        });
+
+        return back()->with('success', 'Movimiento de stock registrado correctamente.');
+    }
+
     public function destroy(Product $product)
     {
-        $product->delete();
-
-        return redirect()->route('products.index')->with('success', 'Producto eliminado exitosamente.');
+        // Deactivated as per requirements
+        return back()->with('error', 'La eliminación de productos está deshabilitada.');
     }
 }

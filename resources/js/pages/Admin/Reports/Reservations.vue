@@ -117,7 +117,7 @@ const financialOptions = computed(() => ({
         enabled: true,
         offsetY: -5,
         formatter: function (val: number) {
-            return 'Bs. ' + val;
+            return 'Bs. ' + new Intl.NumberFormat('es-BO').format(val);
         },
         style: {
             fontSize: '10px',
@@ -145,12 +145,17 @@ const financialOptions = computed(() => ({
             text: 'Ingresos (Bs.)',
             style: { color: '#64748b' }
         },
-        labels: { style: { colors: '#64748b' } }
+        labels: {
+            style: { colors: '#64748b' },
+            formatter: function (val: number) {
+                return new Intl.NumberFormat('es-BO').format(val);
+            }
+        }
     },
     tooltip: {
         y: {
             formatter: function (val: number) {
-                return "Bs. " + val;
+                return "Bs. " + new Intl.NumberFormat('es-BO').format(val);
             }
         }
     },

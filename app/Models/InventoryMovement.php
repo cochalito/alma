@@ -16,6 +16,13 @@ class InventoryMovement extends Model
         'description',
     ];
 
+    protected $casts = [
+        'quantity' => 'integer',
+        'product_id' => 'integer',
+        'user_id' => 'integer',
+        'reservation_id' => 'integer',
+    ];
+
     public function product()
     {
         return $this->belongsTo(Product::class);

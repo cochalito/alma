@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type PaginatedData, type Product, type ProductCategory } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { ChevronLeft, ChevronRight, Package, Pencil, Plus, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ChevronLeft, ChevronRight, Package, Pencil, Plus, Search, ArrowUpDown, ArrowUp, ArrowDown, X, TrendingUp, TrendingDown } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
 
+interface ProductWithLocations extends Product {
+    locations: { location: string; stock: number }[];
+    total_stock: number;
+}
+
 interface Props {
-    products: PaginatedData<Product>;
+    products: PaginatedData<ProductWithLocations>;
     filters?: { search?: string; sort?: string; direction?: string };
+    locations: string[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -31,13 +37,44 @@ const categoryLabels: Record<ProductCategory, string> = {
 };
 
 function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount).replace('BOB', 'Bs.');
 }
 
-function deleteProduct(id: number) {
-    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-        router.delete(`/admin/products/${id}`);
-    }
+// Modal State
+const isAdjustmentModalOpen = ref(false);
+const adjustmentType = ref<'in' | 'out'>('in');
+const selectedProductForAdjustment = ref<ProductWithLocations | null>(null);
+
+const adjustmentForm = useForm({
+    product_id: null as number | null,
+    location: '',
+    type: 'in' as 'in' | 'out',
+    quantity: 1,
+    description: '',
+});
+
+function openAdjustmentModal(product: ProductWithLocations, type: 'in' | 'out') {
+    selectedProductForAdjustment.value = product;
+    adjustmentType.value = type;
+    adjustmentForm.product_id = product.id;
+    adjustmentForm.type = type;
+    adjustmentForm.location = props.locations[0] || '';
+    adjustmentForm.quantity = 1;
+    adjustmentForm.description = '';
+    isAdjustmentModalOpen.value = true;
+}
+
+function submitAdjustment() {
+    adjustmentForm.post('/admin/products/stock-adjustment', {
+        onSuccess: () => {
+            isAdjustmentModalOpen.value = false;
+        },
+    });
+}
+
+function getStockAt(product: ProductWithLocations, location: string) {
+    const loc = product.locations?.find(l => l.location === location);
+    return loc ? loc.stock : 0;
 }
 
 const search = ref(props.filters?.search ?? '');
@@ -79,7 +116,7 @@ function clearFilters() {
         <div class="flex flex-col gap-6 p-6">
 
             <!-- Header -->
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between font-outfit">
                 <div class="flex items-center gap-3">
                     <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <Package class="h-5 w-5" />
@@ -87,7 +124,7 @@ function clearFilters() {
                     <div>
                         <h1 class="text-2xl font-bold tracking-tight">Productos Minibar</h1>
                         <p class="text-sm text-muted-foreground">
-                            {{ products.total }} productos en total
+                            {{ products.total }} productos registrados
                         </p>
                     </div>
                 </div>
@@ -105,7 +142,7 @@ function clearFilters() {
                     <label class="text-xs font-semibold text-muted-foreground uppercase">Buscar Producto</label>
                     <div class="relative">
                         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input v-model="search" placeholder="Buscar por Nombre, Descripción o Categoría..." class="pl-9 h-9" />
+                        <Input v-model="search" placeholder="Nombre, descripción o categoría..." class="pl-9 h-9" />
                     </div>
                 </div>
                 <Button variant="ghost" size="sm" class="h-9 text-muted-foreground hover:text-foreground" @click="clearFilters" v-if="search">
@@ -129,8 +166,9 @@ function clearFilters() {
                                 <th class="px-4 py-3 text-right font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('price')">
                                     <div class="flex items-center gap-1 justify-end">Precio <ArrowUp v-if="sortParams.sort==='price' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='price' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
-                                <th class="px-4 py-3 text-center font-semibold text-muted-foreground">
-                                    <div class="flex items-center gap-1 justify-center">Stock Total</div>
+                                <!-- Dynamic Location Columns -->
+                                <th v-for="loc in locations" :key="loc" class="px-4 py-3 text-center font-semibold text-muted-foreground">
+                                    Stock {{ loc }}
                                 </th>
                                 <th class="px-4 py-3 text-center font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('is_active')">
                                     <div class="flex items-center gap-1 justify-center">Estado <ArrowUp v-if="sortParams.sort==='is_active' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='is_active' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
@@ -140,7 +178,7 @@ function clearFilters() {
                         </thead>
                         <tbody>
                             <tr v-if="products.data.length === 0">
-                                <td colspan="6" class="px-4 py-12 text-center text-muted-foreground">
+                                <td :colspan="5 + locations.length" class="px-4 py-12 text-center text-muted-foreground">
                                     No hay productos registrados aún.
                                 </td>
                             </tr>
@@ -159,20 +197,23 @@ function clearFilters() {
                                     <Badge variant="outline">{{ categoryLabels[product.category] }}</Badge>
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold">{{ formatCurrency(product.price) }}</td>
-                                <td class="px-4 py-3 text-center">
+
+                                <!-- Stock per Location -->
+                                <td v-for="loc in locations" :key="loc" class="px-4 py-3 text-center">
                                     <span
                                         :class="[
                                             'inline-flex h-6 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold',
-                                            product.total_stock > 5
+                                            getStockAt(product, loc) > 5
                                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : product.total_stock > 0
+                                                : getStockAt(product, loc) > 0
                                                     ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                                                     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                         ]"
                                     >
-                                        {{ product.total_stock }}
+                                        {{ getStockAt(product, loc) }}
                                     </span>
                                 </td>
+
                                 <td class="px-4 py-3 text-center">
                                     <Badge :variant="product.is_active ? 'default' : 'secondary'">
                                         {{ product.is_active ? 'Activo' : 'Inactivo' }}
@@ -180,20 +221,29 @@ function clearFilters() {
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-1">
-                                        <Link :href="`/admin/products/${product.id}/edit`">
-                                            <Button variant="ghost" size="icon" title="Editar">
-                                                <Pencil class="h-4 w-4" />
-                                            </Button>
-                                        </Link>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            title="Eliminar"
-                                            class="text-destructive hover:text-destructive"
-                                            @click="deleteProduct(product.id)"
+                                            class="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                            title="Alta de Stock"
+                                            @click="openAdjustmentModal(product, 'in')"
                                         >
-                                            <Trash2 class="h-4 w-4" />
+                                            <TrendingUp class="h-4 w-4" />
                                         </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            title="Baja de Stock"
+                                            @click="openAdjustmentModal(product, 'out')"
+                                        >
+                                            <TrendingDown class="h-4 w-4" />
+                                        </Button>
+                                        <Link :href="`/admin/products/${product.id}/edit`">
+                                            <Button variant="ghost" size="icon" title="Editar Información">
+                                                <Pencil class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
                                     </div>
                                 </td>
                             </tr>
@@ -228,6 +278,68 @@ function clearFilters() {
                             </Link>
                         </template>
                     </div>
+                </div>
+            </div>
+
+            <!-- Adjustment Modal -->
+            <div v-if="isAdjustmentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div class="bg-card border border-border rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div class="p-6 border-b border-border flex justify-between items-center bg-muted/20">
+                        <div class="flex items-center gap-3">
+                            <div :class="[
+                                'flex h-10 w-10 items-center justify-center rounded-lg',
+                                adjustmentType === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            ]">
+                                <TrendingUp v-if="adjustmentType === 'in'" class="h-5 w-5" />
+                                <TrendingDown v-else class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold">{{ adjustmentType === 'in' ? 'Alta de Stock' : 'Baja de Stock' }}</h3>
+                                <p class="text-xs text-muted-foreground">{{ selectedProductForAdjustment?.name }}</p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="icon" @click="isAdjustmentModalOpen = false">
+                            <X class="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <form @submit.prevent="submitAdjustment" class="p-6 space-y-4">
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Sucursal</label>
+                            <select
+                                v-model="adjustmentForm.location"
+                                class="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                                <option v-for="loc in locations" :key="loc" :value="loc">{{ loc }}</option>
+                            </select>
+                            <p v-if="adjustmentForm.errors.location" class="text-xs text-destructive">{{ adjustmentForm.errors.location }}</p>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Cantidad</label>
+                            <Input v-model="adjustmentForm.quantity" type="number" min="1" required />
+                            <p v-if="adjustmentForm.errors.quantity" class="text-xs text-destructive">{{ adjustmentForm.errors.quantity }}</p>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Descripción / Motivo {{ adjustmentType === 'out' ? '*' : '' }}</label>
+                            <textarea
+                                v-model="adjustmentForm.description"
+                                rows="3"
+                                class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                                :placeholder="adjustmentType === 'in' ? 'Opcional...' : 'Motivo de la baja (Requerido)...'"
+                                :required="adjustmentType === 'out'"
+                            ></textarea>
+                            <p v-if="adjustmentForm.errors.description" class="text-xs text-destructive">{{ adjustmentForm.errors.description }}</p>
+                        </div>
+
+                        <div class="pt-2 flex gap-3">
+                            <Button type="button" variant="outline" class="flex-1" @click="isAdjustmentModalOpen = false">Cancelar</Button>
+                            <Button type="submit" :disabled="adjustmentForm.processing" :class="['flex-1', adjustmentType === 'in' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700']">
+                                {{ adjustmentForm.processing ? 'Registrando...' : 'Confirmar' }}
+                            </Button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
