@@ -41,6 +41,41 @@ class ProfileController extends Controller
     }
 
     /**
+     * Quick update from the profile modal (name, email, password only).
+     */
+    public function quickUpdate(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', \Illuminate\Validation\Rule::unique('users', 'email')->ignore($user->id)],
+        ];
+
+        if ($request->filled('password')) {
+            $rules['password'] = ['string', 'min:8', 'confirmed'];
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($request->filled('password')) {
+            $validated['password'] = \Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        $user->fill($validated);
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        return back()->with('success', 'Perfil actualizado correctamente.');
+    }
+
+    /**
      * Delete the user's profile.
      */
     public function destroy(Request $request): RedirectResponse

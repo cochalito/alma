@@ -15,6 +15,16 @@ class DepartamentController extends Controller
     {
         $query = Departament::query();
 
+        // Role-based Location Filtering
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $query->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $query->where('location', 'UYUNI');
+            }
+        }
+
         // Filtering
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -56,6 +66,15 @@ class DepartamentController extends Controller
      */
     public function store(Request $request)
     {
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $request->merge(['location' => 'LP']);
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $request->merge(['location' => 'UYUNI']);
+            }
+        }
+
         $validated = $request->validate([
             'code' => 'required|string|max:255',
             'location' => 'required|string|max:255',
@@ -83,6 +102,15 @@ class DepartamentController extends Controller
      */
     public function update(Request $request, Departament $departament)
     {
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $request->merge(['location' => 'LP']);
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $request->merge(['location' => 'UYUNI']);
+            }
+        }
+
         $validated = $request->validate([
             'code' => 'required|string|max:255',
             'location' => 'required|string|max:255',

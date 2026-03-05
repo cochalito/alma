@@ -19,6 +19,7 @@ class UserController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('role', 'like', "%{$search}%");
             });
@@ -28,7 +29,7 @@ class UserController extends Controller
         $sort = $request->input('sort', 'updated_at');
         $direction = $request->input('direction', 'desc');
 
-        $allowedSorts = ['id', 'name', 'email', 'role', 'status', 'updated_at'];
+        $allowedSorts = ['id', 'name', 'username', 'email', 'role', 'status', 'updated_at'];
         if (in_array($sort, $allowedSorts)) {
             $query->orderBy($sort, $direction);
         } else {
@@ -58,6 +59,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'username' => 'required|string|max:100|unique:users|alpha_dash',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'role' => 'required|string|max:50',
@@ -96,6 +98,7 @@ class UserController extends Controller
     {
         $rules = [
             'name' => 'required|string|max:255',
+            'username' => 'required|string|max:100|alpha_dash|unique:users,username,' . $user->id,
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'role' => 'required|string|max:50',
             'status' => 'required|in:1,0',

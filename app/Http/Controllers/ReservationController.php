@@ -15,6 +15,16 @@ class ReservationController extends Controller
     {
         $query = Reservation::with(['employee', 'departament', 'customer', 'products']);
 
+        // Role-based Location Filtering
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $query->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $query->where('location', 'UYUNI');
+            }
+        }
+
         // Filtering
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -52,11 +62,20 @@ class ReservationController extends Controller
 
         $reservations = $query->paginate(10)->withQueryString();
 
+        $departmentsQuery = Departament::query();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $departmentsQuery->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $departmentsQuery->where('location', 'UYUNI');
+            }
+        }
+
         return Inertia::render('Admin/Reservations/Index', [
             'reservations' => $reservations,
             'filters' => $request->only(['search', 'location', 'departament_id', 'date', 'sort', 'direction']),
             'employees' => User::all(),
-            'departments' => Departament::all(),
+            'departments' => $departmentsQuery->get(),
             'customers' => Customer::all(),
             'products' => \App\Models\Product::where('is_active', true)->get(),
         ]);
@@ -64,15 +83,34 @@ class ReservationController extends Controller
 
     public function create()
     {
+        $departmentsQuery = Departament::query();
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $departmentsQuery->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $departmentsQuery->where('location', 'UYUNI');
+            }
+        }
+
         return Inertia::render('Admin/Reservations/Create', [
             'employees' => User::all(),
-            'departaments' => Departament::all(),
+            'departaments' => $departmentsQuery->get(),
             'customers' => Customer::all(),
         ]);
     }
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $request->merge(['location' => 'LP']);
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $request->merge(['location' => 'UYUNI']);
+            }
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'employee_id' => 'required|exists:users,id',
             'departament_id' => 'required|exists:departament,id',
@@ -200,16 +238,40 @@ class ReservationController extends Controller
     {
         $reservation->load(['employee', 'departament', 'customer', 'products']);
 
+        $departmentsQuery = Departament::query();
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $departmentsQuery->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $departmentsQuery->where('location', 'UYUNI');
+            }
+        }
+
         return Inertia::render('Admin/Reservations/Edit', [
             'reservation' => $reservation,
             'employees' => User::all(),
-            'departaments' => Departament::all(), // Show all to allow editing even if currently unavailable
+            'departaments' => $departmentsQuery->get(), // Show all to allow editing even if currently unavailable
             'customers' => Customer::all(),
         ]);
     }
 
     public function update(Request $request, Reservation $reservation)
     {
+        // Prevent editing a reservation that has already been checked out
+        if ($reservation->status === '3') {
+            return back()->withErrors(['status' => 'Esta reserva ya ha realizado el Check Out y no puede ser editada.']);
+        }
+
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $request->merge(['location' => 'LP']);
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $request->merge(['location' => 'UYUNI']);
+            }
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'employee_id' => 'required|exists:users,id',
             'departament_id' => 'required|exists:departament,id',

@@ -13,6 +13,16 @@ class CharterController extends Controller
     public function index(Request $request)
     {
         $location = $request->input('location', 'LP');
+
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $location = 'LP';
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $location = 'UYUNI';
+            }
+        }
+
         $date = $request->input('date', now()->toDateString());
 
         // Parse selected date and get the start and end of the week (Monday to Sunday)

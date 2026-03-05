@@ -238,7 +238,14 @@ function openEditModal(res: Reservation) {
                                             </Button>
                                         </Link>
                                         -->
-                                        <Button variant="ghost" size="icon" title="Editar" @click="openEditModal(reservation)">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            :title="reservation.status === '3' ? 'Reserva en Check Out – no editable' : 'Editar'"
+                                            :disabled="reservation.status === '3'"
+                                            :class="reservation.status === '3' ? 'opacity-30 cursor-not-allowed' : ''"
+                                            @click="reservation.status !== '3' && openEditModal(reservation)"
+                                        >
                                             <Pencil class="h-4 w-4" />
                                         </Button>
                                         <Button

@@ -14,9 +14,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = useForm({
     name: '',
+    username: '',
     email: '',
     password: '',
-    role: 'ADMINISTRADOR',
+    role: 'GERENCIA',
     status: '1',
 });
 
@@ -64,6 +65,14 @@ function submit() {
                                 <p v-if="form.errors.name" class="text-xs text-destructive">{{ form.errors.name }}</p>
                             </div>
 
+                            <!-- Username -->
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-medium">Nombre de Usuario *</label>
+                                <Input v-model="form.username" placeholder="Ej: juan.perez" required />
+                                <p class="text-xs text-muted-foreground">Solo letras, números, guiones y guiones bajos.</p>
+                                <p v-if="form.errors.username" class="text-xs text-destructive">{{ form.errors.username }}</p>
+                            </div>
+
                             <!-- Email -->
                             <div class="space-y-1.5">
                                 <label class="text-sm font-medium">Correo Electrónico *</label>
@@ -87,9 +96,13 @@ function submit() {
                                     class="file:text-foreground placeholder:text-muted-foreground dark:bg-input/30 border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                                     required
                                 >
-                                    <option value="ADMINISTRADOR">Administrador</option>
-                                    <option value="OPERADOR_LA_PAZ">Operador La Paz</option>
-                                    <option value="OPERADOR_UYUNI">Operador Uyuni</option>
+                                    <option value="GERENCIA">Gerencia</option>
+                                    <option value="ADMINISTRACION">Administración (Ambas)</option>
+                                    <option value="ADMINISTRACION_LA_PAZ">Administración (La Paz)</option>
+                                    <option value="ADMINISTRACION_UYUNI">Administración (Uyuni)</option>
+                                    <option value="RECEPCIONISTA">Recepcionista (Ambas)</option>
+                                    <option value="RECEPCIONISTA_LA_PAZ">Recepcionista (La Paz)</option>
+                                    <option value="RECEPCIONISTA_UYUNI">Recepcionista (Uyuni)</option>
                                 </select>
                                 <p v-if="form.errors.role" class="text-xs text-destructive">{{ form.errors.role }}</p>
                             </div>

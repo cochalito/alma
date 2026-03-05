@@ -38,13 +38,31 @@ class ProductController extends Controller
 
         $products = $query->paginate(10)->withQueryString();
 
-        $products->getCollection()->transform(function ($product) {
+        $locationsQuery = Departament::select('location')->distinct();
+        $user = auth()->user();
+        $allowedLocation = null;
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $locationsQuery->where('location', 'LP');
+                $allowedLocation = 'LP';
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $locationsQuery->where('location', 'UYUNI');
+                $allowedLocation = 'UYUNI';
+            }
+        }
+        $locations = $locationsQuery->pluck('location');
+
+        $products->getCollection()->transform(function ($product) use ($allowedLocation) {
             $data = $product->toArray();
-            $data['total_stock'] = $product->totalStock();
+            if ($allowedLocation) {
+                $data['total_stock'] = $product->stockAt($allowedLocation);
+                // Filter the pre-loaded relations to only include the allowed location
+                $data['locations'] = collect($data['locations'])->filter(fn($loc) => $loc['location'] === $allowedLocation)->values()->all();
+            } else {
+                $data['total_stock'] = $product->totalStock();
+            }
             return $data;
         });
-
-        $locations = Departament::select('location')->distinct()->pluck('location');
 
         return Inertia::render('Admin/Products/Index', [
             'products' => $products,
@@ -55,7 +73,16 @@ class ProductController extends Controller
 
     public function create()
     {
-        $locations = Departament::select('location')->distinct()->pluck('location');
+        $locationsQuery = Departament::select('location')->distinct();
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $locationsQuery->where('location', 'LP');
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $locationsQuery->where('location', 'UYUNI');
+            }
+        }
+        $locations = $locationsQuery->pluck('location');
         return Inertia::render('Admin/Products/Create', [
             'locations' => $locations
         ]);
@@ -122,6 +149,15 @@ class ProductController extends Controller
 
     public function stockAdjustment(Request $request)
     {
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $request->merge(['location' => 'LP']);
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $request->merge(['location' => 'UYUNI']);
+            }
+        }
+
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
             'location' => 'required|string',

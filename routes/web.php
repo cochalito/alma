@@ -21,6 +21,15 @@ Route::get('/', function () {
 
 Route::get('dashboard', function () {
     $today = Carbon::today();
+    $user = auth()->user();
+    $allowedLocation = null;
+    if ($user) {
+        if (str_ends_with($user->role, '_LA_PAZ')) {
+            $allowedLocation = 'LP';
+        } elseif (str_ends_with($user->role, '_UYUNI')) {
+            $allowedLocation = 'UYUNI';
+        }
+    }
 
     $checkInsToday = [
         'LP' => Reservation::whereDate('check_in', $today)->where('location', 'LP')->count(),
@@ -55,9 +64,15 @@ Route::get('dashboard', function () {
         'UYUNI' => max(0, $totalActiveDepartmentsUyuni - $occupiedDepartmentsToday['UYUNI']),
     ];
 
-    $recentReservations = Reservation::with(['departament', 'customer'])
+    $recentResQuery = Reservation::with(['departament', 'customer'])
         ->orderBy('updated_at', 'desc')
-        ->limit(10)
+        ->limit(10);
+
+    if ($allowedLocation) {
+        $recentResQuery->where('location', $allowedLocation);
+    }
+
+    $recentReservations = $recentResQuery
         ->get()
         ->map(function ($res) {
             return [
@@ -94,26 +109,47 @@ Route::get('dashboard', function () {
         return $today->copy()->subDays($days)->format('Y-m-d');
     });
 
+    $baseSeries = [
+        [
+            'name' => 'Check-In LP',
+            'location' => 'LP',
+            'data' => $chartDates->map(fn($date) => isset($allCheckIns[$date]) ? $allCheckIns[$date]->where('location', 'LP')->count() : 0)->toArray()
+        ],
+        [
+            'name' => 'Check-Out LP',
+            'location' => 'LP',
+            'data' => $chartDates->map(fn($date) => isset($allCheckOuts[$date]) ? $allCheckOuts[$date]->where('location', 'LP')->count() : 0)->toArray()
+        ],
+        [
+            'name' => 'Check-In UYUNI',
+            'location' => 'UYUNI',
+            'data' => $chartDates->map(fn($date) => isset($allCheckIns[$date]) ? $allCheckIns[$date]->where('location', 'UYUNI')->count() : 0)->toArray()
+        ],
+        [
+            'name' => 'Check-Out UYUNI',
+            'location' => 'UYUNI',
+            'data' => $chartDates->map(fn($date) => isset($allCheckOuts[$date]) ? $allCheckOuts[$date]->where('location', 'UYUNI')->count() : 0)->toArray()
+        ]
+    ];
+
+    if ($allowedLocation) {
+        $baseSeries = array_filter($baseSeries, fn($s) => $s['location'] === $allowedLocation);
+        // Remove location key
+        $baseSeries = array_map(function($s) { unset($s['location']); return $s; }, array_values($baseSeries));
+
+        // Remove other location from stats
+        $otherLoc = $allowedLocation === 'LP' ? 'UYUNI' : 'LP';
+        unset($checkInsToday[$otherLoc]);
+        unset($checkOutsToday[$otherLoc]);
+        unset($occupiedDepartmentsToday[$otherLoc]);
+        unset($freeDepartmentsToday[$otherLoc]);
+    } else {
+        $baseSeries = array_map(function($s) { unset($s['location']); return $s; }, $baseSeries);
+    }
+
     $chartData = [
         'categories' => $chartDates->map(fn($date) => Carbon::parse($date)->format('d M'))->toArray(),
-        'series' => [
-            [
-                'name' => 'Check-In LP',
-                'data' => $chartDates->map(fn($date) => isset($allCheckIns[$date]) ? $allCheckIns[$date]->where('location', 'LP')->count() : 0)->toArray()
-            ],
-            [
-                'name' => 'Check-Out LP',
-                'data' => $chartDates->map(fn($date) => isset($allCheckOuts[$date]) ? $allCheckOuts[$date]->where('location', 'LP')->count() : 0)->toArray()
-            ],
-            [
-                'name' => 'Check-In UYUNI',
-                'data' => $chartDates->map(fn($date) => isset($allCheckIns[$date]) ? $allCheckIns[$date]->where('location', 'UYUNI')->count() : 0)->toArray()
-            ],
-            [
-                'name' => 'Check-Out UYUNI',
-                'data' => $chartDates->map(fn($date) => isset($allCheckOuts[$date]) ? $allCheckOuts[$date]->where('location', 'UYUNI')->count() : 0)->toArray()
-            ]
-        ]
+        'series' => $baseSeries
     ];
 
     return Inertia::render('Dashboard', [
@@ -128,7 +164,7 @@ Route::get('dashboard', function () {
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'verified', \App\Http\Middleware\CheckRole::class])->prefix('admin')->group(function () {
     Route::resource('users', UserController::class);
     Route::resource('departaments', \App\Http\Controllers\DepartamentController::class);
     Route::post('customers/quick', [CustomerController::class, 'quickStore'])->name('customers.quick');

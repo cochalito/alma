@@ -159,7 +159,18 @@ class ReportController extends Controller
         $dateTo = $request->query('date_to');
 
         $products = \App\Models\Product::orderBy('name')->get();
-        $locations = Departament::select('location')->distinct()->pluck('location');
+        $locationsQuery = Departament::select('location')->distinct();
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $locationsQuery->where('location', 'LP');
+                $location = 'LP';
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $locationsQuery->where('location', 'UYUNI');
+                $location = 'UYUNI';
+            }
+        }
+        $locations = $locationsQuery->pluck('location');
 
         $movements = null;
         $product = null;

@@ -7,14 +7,17 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { logout } from '@/routes';
-import { edit } from '@/routes/profile/index';
 import type { User } from '@/types';
 import { Link, router } from '@inertiajs/vue3';
-import { LogOut } from 'lucide-vue-next';
+import { LogOut, UserCog } from 'lucide-vue-next';
 
 interface Props {
     user: User;
 }
+
+const emit = defineEmits<{
+    (e: 'open-profile'): void;
+}>();
 
 const handleLogout = () => {
     router.flushAll();
@@ -29,6 +32,16 @@ defineProps<Props>();
             <UserInfo :user="user" :show-email="true" />
         </div>
     </DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuGroup>
+        <DropdownMenuItem
+            class="cursor-pointer"
+            @click.prevent="emit('open-profile')"
+        >
+            <UserCog class="mr-2 h-4 w-4" />
+            Editar perfil
+        </DropdownMenuItem>
+    </DropdownMenuGroup>
     <DropdownMenuSeparator />
     <DropdownMenuItem :as-child="true">
         <Link

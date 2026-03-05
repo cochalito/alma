@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2 } from 'lucide-vue-next';
+import { Plus, Trash2, AlertTriangle, Lock } from 'lucide-vue-next';
 
 interface Props {
     open: boolean;
@@ -224,12 +224,46 @@ watch([() => form.departament_id, () => form.check_in, () => form.check_out], ([
     }
 });
 
+// Checkout confirmation
+const showCheckoutConfirm = ref(false);
+const pendingCheckoutStatus = ref<string | null>(null);
+
+// A reservation already in checkout state cannot be edited
+const isCheckedOut = computed(() => props.reservation?.status === '3');
+
+function handleStatusChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const newValue = select.value;
+    if (newValue === '3' && form.status !== '3') {
+        // Revert the visual selection
+        select.value = form.status;
+        pendingCheckoutStatus.value = '3';
+        showCheckoutConfirm.value = true;
+    } else {
+        form.status = newValue;
+    }
+}
+
+function confirmCheckout() {
+    form.status = '3';
+    showCheckoutConfirm.value = false;
+    pendingCheckoutStatus.value = null;
+}
+
+function cancelCheckout() {
+    showCheckoutConfirm.value = false;
+    pendingCheckoutStatus.value = null;
+}
+
 function closeDialog() {
     emit('update:open', false);
     form.reset();
+    showCheckoutConfirm.value = false;
+    pendingCheckoutStatus.value = null;
 }
 
 function submit() {
+    if (isCheckedOut.value) return;
     if (props.reservation) {
         form.put(`/admin/reservations/${props.reservation.id}`, {
             onSuccess: () => {
@@ -262,7 +296,13 @@ function submit() {
                 </DialogDescription>
             </DialogHeader>
 
-            <form @submit.prevent="submit" class="space-y-6 py-4">
+            <!-- Locked banner for checked-out reservations -->
+            <div v-if="isCheckedOut" class="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-3 text-amber-700 dark:text-amber-400 text-sm font-medium">
+                <Lock class="h-4 w-4 shrink-0" />
+                Esta reserva está en estado <strong class="ml-1">Check Out</strong> y ya no puede ser editada.
+            </div>
+
+            <form @submit.prevent="submit" class="space-y-6 py-4" :class="{ 'pointer-events-none opacity-60': isCheckedOut }">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" v-if="!reservation">
                     <div class="flex flex-col gap-1.5">
                         <div class="flex items-center justify-between">
@@ -371,7 +411,31 @@ function submit() {
                     <!-- Estado -->
                     <div class="flex flex-col gap-1.5">
                         <label class="text-sm font-medium">Estado <span class="text-destructive">*</span></label>
-                        <select v-model="form.status" class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" required>
+
+                        <!-- Confirmation card shown inline replacing the select -->
+                        <div v-if="showCheckoutConfirm" class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3 space-y-3">
+                            <div class="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                                <AlertTriangle class="h-4 w-4 shrink-0" />
+                                <span class="text-xs font-semibold">Confirmar Check Out</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground leading-relaxed">
+                                ¿Está seguro? Una vez en <strong>Check Out</strong> la reserva no podrá editarse.
+                            </p>
+                            <div class="flex gap-2">
+                                <Button type="button" variant="outline" size="sm" class="h-7 text-xs flex-1" @click="cancelCheckout">Cancelar</Button>
+                                <Button type="button" size="sm" class="h-7 text-xs flex-1 bg-amber-600 hover:bg-amber-700 text-white" @click="confirmCheckout">
+                                    Sí, Check Out
+                                </Button>
+                            </div>
+                        </div>
+
+                        <select
+                            v-else
+                            :value="form.status"
+                            @change="handleStatusChange"
+                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            required
+                        >
                             <option value="1">Confirmada</option>
                             <option value="2">Check In</option>
                             <option value="3">Check Out</option>
@@ -484,7 +548,7 @@ function submit() {
                     <Button type="button" variant="outline" @click="closeDialog" :disabled="form.processing">
                         Cancelar
                     </Button>
-                    <Button type="submit" :disabled="form.processing">
+                    <Button type="submit" :disabled="form.processing || isCheckedOut">
                         {{ form.processing ? 'Guardando...' : 'Guardar Cambios' }}
                     </Button>
                 </DialogFooter>

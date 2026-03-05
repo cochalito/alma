@@ -12,6 +12,7 @@ import debounce from 'lodash/debounce';
 interface User {
     id: number;
     name: string;
+    username: string;
     email: string;
     role: string;
     status: string;
@@ -98,7 +99,7 @@ function clearFilters() {
                     <label class="text-xs font-semibold text-muted-foreground uppercase">Buscar Usuario</label>
                     <div class="relative">
                         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input v-model="search" placeholder="Buscar por Nombre, Correo o Rol..." class="pl-9 h-9" />
+                        <Input v-model="search" placeholder="Buscar por Nombre, Usuario, Correo o Rol..." class="pl-9 h-9" />
                     </div>
                 </div>
                 <Button variant="ghost" size="sm" class="h-9 text-muted-foreground hover:text-foreground" @click="clearFilters" v-if="search">
@@ -116,6 +117,9 @@ function clearFilters() {
                                 <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('name')">
                                     <div class="flex items-center gap-1">Nombre <ArrowUp v-if="sortParams.sort==='name' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='name' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
+                                <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('username')">
+                                    <div class="flex items-center gap-1">Usuario <ArrowUp v-if="sortParams.sort==='username' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='username' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
+                                </th>
                                 <th class="px-4 py-3 text-left font-semibold text-muted-foreground cursor-pointer hover:bg-muted/60 transition-colors" @click="handleSort('email')">
                                     <div class="flex items-center gap-1">Correo Electrónico <ArrowUp v-if="sortParams.sort==='email' && sortParams.direction==='asc'" class="h-3 w-3"/><ArrowDown v-else-if="sortParams.sort==='email' && sortParams.direction==='desc'" class="h-3 w-3"/><ArrowUpDown v-else class="h-3 w-3 opacity-30"/></div>
                                 </th>
@@ -130,7 +134,7 @@ function clearFilters() {
                         </thead>
                         <tbody>
                             <tr v-if="users.data.length === 0">
-                                <td colspan="5" class="px-4 py-12 text-center text-muted-foreground">
+                                <td colspan="6" class="px-4 py-12 text-center text-muted-foreground">
                                     No hay usuarios registrados aún.
                                 </td>
                             </tr>
@@ -141,8 +145,9 @@ function clearFilters() {
                             >
                                 <td class="px-4 py-3">
                                     <div class="font-medium">{{ user.name }}</div>
+                                    <div class="text-xs text-muted-foreground">{{ user.username ? '@' + user.username : '' }}</div>
                                 </td>
-                                <td class="px-4 py-3 text-muted-foreground">
+                                <td class="px-4 py-3 font-mono text-sm text-muted-foreground">
                                     {{ user.email }}
                                 </td>
                                 <td class="px-4 py-3 text-center">

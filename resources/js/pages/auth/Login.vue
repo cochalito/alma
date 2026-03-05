@@ -22,7 +22,7 @@ defineProps<{
 <template>
     <AuthBase
         title="Inicia sesión en tu cuenta"
-        description="Ingresa tu correo y contraseña para continuar"
+        description="Ingresa tu usuario o correo y contraseña para continuar"
     >
         <Head title="Iniciar sesión" />
 
@@ -41,19 +41,19 @@ defineProps<{
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="email">Correo electrónico</Label>
+                    <Label for="login">Usuario o correo electrónico</Label>
                     <Input
-                        id="email"
-                        type="email"
-                        name="email"
+                        id="login"
+                        type="text"
+                        name="login"
                         required
                         autofocus
                         :tabindex="1"
-                        autocomplete="email"
-                        placeholder="correo@ejemplo.com"
+                        autocomplete="username"
+                        placeholder="usuario o correo@ejemplo.com"
                         class="h-11"
                     />
-                    <InputError :message="errors.email" />
+                    <InputError :message="errors.login" />
                 </div>
 
                 <div class="grid gap-2">

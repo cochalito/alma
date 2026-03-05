@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UserInfo from '@/components/UserInfo.vue';
+import UserProfileModal from '@/components/UserProfileModal.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,10 +15,13 @@ import {
 import { usePage } from '@inertiajs/vue3';
 import { ChevronsUpDown } from 'lucide-vue-next';
 import UserMenuContent from './UserMenuContent.vue';
+import { ref } from 'vue';
 
 const page = usePage();
 const user = page.props.auth.user;
 const { isMobile, state } = useSidebar();
+
+const profileModalOpen = ref(false);
 </script>
 
 <template>
@@ -46,9 +50,12 @@ const { isMobile, state } = useSidebar();
                     align="end"
                     :side-offset="4"
                 >
-                    <UserMenuContent :user="user" />
+                    <UserMenuContent :user="user" @open-profile="profileModalOpen = true" />
                 </DropdownMenuContent>
             </DropdownMenu>
         </SidebarMenuItem>
     </SidebarMenu>
+
+    <!-- Modal rendered outside the dropdown to avoid z-index / portal issues -->
+    <UserProfileModal v-model:open="profileModalOpen" />
 </template>
