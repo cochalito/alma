@@ -65,6 +65,11 @@ const reportItems: NavItem[] = [
         icon: FileText,
     },
     {
+        title: 'Reporte de Ventas',
+        href: '/admin/reports/sales',
+        icon: FileText,
+    },
+    {
         title: 'Reporte de Productos',
         href: '/admin/reports/kardex',
         icon: FileText,

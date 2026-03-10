@@ -150,6 +150,96 @@ class ReportController extends Controller
         ]);
     }
 
+    public function sales(Request $request)
+    {
+        $location = $request->query('location');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+
+        // Role-based Location Filtering
+        $locationsQuery = Departament::select('location')->distinct();
+        $user = auth()->user();
+        if ($user) {
+            if (str_ends_with($user->role, '_LA_PAZ')) {
+                $locationsQuery->where('location', 'LP');
+                $location = 'LP';
+            } elseif (str_ends_with($user->role, '_UYUNI')) {
+                $locationsQuery->where('location', 'UYUNI');
+                $location = 'UYUNI';
+            }
+        }
+        $locations = $locationsQuery->pluck('location');
+
+        $query = \Illuminate\Support\Facades\DB::table('reservation_product')
+            ->join('reservations', 'reservation_product.reservation_id', '=', 'reservations.id')
+            ->join('products', 'reservation_product.product_id', '=', 'products.id')
+            ->leftJoin('customers', 'reservations.customer_id', '=', 'customers.id')
+            ->select(
+                'reservations.id as reservation_id',
+                'reservations.location',
+                'reservations.created_at as sale_date',
+                'customers.firstname',
+                'customers.lastname',
+                'products.name as product_name',
+                'reservation_product.quantity',
+                'reservation_product.unit_price',
+                'reservation_product.subtotal'
+            )
+            ->where('reservations.status', '!=', '4')
+            ->orderBy('reservations.created_at', 'desc');
+
+        if ($location) {
+            $query->where('reservations.location', $location);
+        }
+
+        if ($dateFrom) {
+            $query->whereDate('reservations.created_at', '>=', $dateFrom);
+        } else {
+            // Default to start of current month
+            $query->whereDate('reservations.created_at', '>=', Carbon::now()->startOfMonth());
+            $dateFrom = Carbon::now()->startOfMonth()->format('Y-m-d');
+        }
+
+        if ($dateTo) {
+            $query->whereDate('reservations.created_at', '<=', $dateTo);
+        } else {
+            // Default to end of current month
+            $query->whereDate('reservations.created_at', '<=', Carbon::now()->endOfMonth());
+            $dateTo = Carbon::now()->endOfMonth()->format('Y-m-d');
+        }
+
+        $sales = $query->get()->map(function ($item) {
+            return [
+                'reservation_id' => $item->reservation_id,
+                'location' => $item->location,
+                'sale_date' => Carbon::parse($item->sale_date)->format('Y-m-d H:i:s'),
+                'customer_name' => trim($item->firstname . ' ' . $item->lastname),
+                'product_name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
+                'subtotal' => $item->subtotal,
+            ];
+        });
+
+        // Calculamos totales
+        $totalItems = $sales->sum('quantity');
+        $totalRevenue = $sales->sum('subtotal');
+
+        return Inertia::render('Admin/Reports/Sales', [
+            'sales' => $sales,
+            'locations' => $locations,
+            'selectedLocation' => $location,
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+            'summary' => [
+                'total_items' => $totalItems,
+                'total_revenue' => $totalRevenue,
+            ],
+        ]);
+    }
+
     public function kardex(Request $request)
     {
         $productId = $request->query('product_id');

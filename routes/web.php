@@ -172,8 +172,10 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\CheckRole::class])->
     Route::post('products/stock-adjustment', [ProductController::class, 'stockAdjustment'])->name('products.stock-adjustment');
     Route::resource('products', ProductController::class);
     Route::resource('reservations', ReservationController::class);
+    Route::get('reservations/{reservation}/print', [ReservationController::class, 'print'])->name('reservations.print');
     Route::get('charter', [CharterController::class, 'index'])->name('charter.index');
     Route::get('reports/reservations', [\App\Http\Controllers\ReportController::class, 'reservations'])->name('reports.reservations');
+    Route::get('reports/sales', [\App\Http\Controllers\ReportController::class, 'sales'])->name('reports.sales');
     Route::get('reports/kardex', [\App\Http\Controllers\ReportController::class, 'kardex'])->name('reports.kardex');
     Route::get('reports/activity', [\App\Http\Controllers\ReportController::class, 'activity'])->name('reports.activity');
 });

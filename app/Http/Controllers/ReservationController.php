@@ -432,6 +432,12 @@ class ReservationController extends Controller
         return back()->with('success', 'Reservación actualizada exitosamente.');
     }
 
+    public function print(Reservation $reservation)
+    {
+        $reservation->load(['departament', 'customer', 'products']);
+        return view('print.reservation', compact('reservation'));
+    }
+
     public function destroy(Reservation $reservation)
     {
         $reservation->delete();

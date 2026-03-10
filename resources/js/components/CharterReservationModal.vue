@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, AlertTriangle, Lock } from 'lucide-vue-next';
+import { Plus, Trash2, AlertTriangle, Lock, Printer } from 'lucide-vue-next';
 
 interface Props {
     open: boolean;
@@ -36,7 +36,7 @@ const customerSearch = ref('');
 const showCustomerDropdown = ref(false);
 
 const filteredCustomers = computed(() => {
-    let sorted = [...localCustomers.value].sort((a, b) =>
+    const sorted = [...localCustomers.value].sort((a, b) =>
         (a.firstname + ' ' + a.lastname).localeCompare(b.firstname + ' ' + b.lastname)
     );
     if (!customerSearch.value) return sorted.slice(0, 50);
@@ -206,7 +206,9 @@ watch(() => form.departament_id, (deptId) => {
 
 // Recalculate cost when dates or department change
 watch([() => form.departament_id, () => form.check_in, () => form.check_out], ([deptId, checkIn, checkOut]) => {
-    // Only auto-calc if creating a new reservation or if actively changing fields, though to keep it simple we always calc if valid values.
+    // Only auto-calc if creating a new reservation
+    if (props.reservation) return;
+
     if (!deptId || !checkIn || !checkOut) return;
 
     const dept = props.departments.find(d => d.id === deptId);
@@ -282,7 +284,7 @@ function submit() {
 
 <template>
     <Dialog :open="open" @update:open="$emit('update:open', $event)">
-        <DialogContent class="sm:max-w-[700px] bg-card text-card-foreground">
+        <DialogContent class="sm:max-w-[1100px] w-[95vw] md:w-[90vw] bg-card text-card-foreground">
             <DialogHeader>
                 <DialogTitle class="text-xl">
                     {{ reservation ? 'Editar Reservación' : 'Nueva Reservación' }}
@@ -302,8 +304,12 @@ function submit() {
                 Esta reserva está en estado <strong class="ml-1">Check Out</strong> y ya no puede ser editada.
             </div>
 
-            <form @submit.prevent="submit" class="space-y-6 py-4" :class="{ 'pointer-events-none opacity-60': isCheckedOut }">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" v-if="!reservation">
+            <form @submit.prevent="submit" class="py-2 flex flex-col gap-6" :class="{ 'pointer-events-none opacity-60': isCheckedOut }">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    
+                    <!-- PRIMERA COLUMNA: Datos principales -->
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" v-if="!reservation">
                     <div class="flex flex-col gap-1.5">
                         <div class="flex items-center justify-between">
                             <label class="text-sm font-medium">Huésped <span class="text-destructive">*</span></label>
@@ -458,20 +464,22 @@ function submit() {
                     </div>
                 </div>
 
-                <div class="flex justify-end mt-2 mb-2">
-                    <div class="w-full sm:w-80">
-                        <div class="flex justify-between items-center text-sm gap-4">
-                            <label class="font-medium text-right flex-1">Costo de Estadía (Bs.) <span class="text-destructive">*</span></label>
-                            <div class="w-32 shrink-0">
-                                <Input v-model="form.total_stay_cost" type="number" step="0.01" required class="h-9 text-right font-bold text-primary" />
+                        <div class="flex justify-end mt-2 mb-2">
+                            <div class="w-full sm:w-80">
+                                <div class="flex justify-between items-center text-sm gap-4">
+                                    <label class="font-medium text-right flex-1">Costo de Estadía (Bs.) <span class="text-destructive">*</span></label>
+                                    <div class="w-32 shrink-0">
+                                        <Input v-model="form.total_stay_cost" type="number" step="0.01" required class="h-9 text-right font-bold text-primary" />
+                                    </div>
+                                </div>
+                                <p v-if="form.errors.total_stay_cost" class="text-xs text-destructive text-right mt-1">{{ form.errors.total_stay_cost }}</p>
                             </div>
                         </div>
-                        <p v-if="form.errors.total_stay_cost" class="text-xs text-destructive text-right mt-1">{{ form.errors.total_stay_cost }}</p>
-                    </div>
-                </div>
+                    </div> <!-- Termina Primera Columna -->
 
-                <div class="space-y-4">
-                    <h3 class="text-sm font-semibold border-b pb-1">Productos y Costos Extras</h3>
+                    <!-- SEGUNDA COLUMNA: Productos y Costos Extras -->
+                    <div class="space-y-5 bg-muted/20 p-5 rounded-xl border border-border/50 flex flex-col h-full">
+                        <h3 class="text-sm font-semibold border-b pb-2">Productos y Costos Extras</h3>
 
                     <div class="flex items-end gap-2 p-3 bg-muted/40 rounded-lg border border-border">
                         <div class="flex-1 flex flex-col gap-1.5 flex-wrap">
@@ -535,24 +543,33 @@ function submit() {
                             </div>
                         </div>
                     </div>
+                    <div class="hidden">
+                        <template v-if="reservation">
+                            <input type="hidden" v-model="form.customer_id" />
+                            <input type="hidden" v-model="form.employee_id" />
+                        </template>
+                        <input type="hidden" v-model="form.location" />
+                    </div>
+                </div> <!-- Termina Segunda Columna -->
+            </div> <!-- Termina Grid Principal -->
+
+            <DialogFooter class="flex gap-2 pt-4 border-t mt-4" :class="reservation && (reservation.status === '2' || reservation.status === '3') ? 'justify-between' : 'justify-end'">
+                <div v-if="reservation && (reservation.status === '2' || reservation.status === '3')">
+                    <a :href="`/admin/reservations/${reservation.id}/print`" target="_blank" class="pointer-events-auto inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 opacity-100 hover:opacity-100" style="opacity: 1 !important;">
+                        <Printer class="mr-2 h-4 w-4" />
+                        Imprimir Nota
+                    </a>
                 </div>
-
-                <!-- Hidden but submitted fields if editing -->
-                <template v-if="reservation">
-                    <input type="hidden" v-model="form.customer_id" />
-                    <input type="hidden" v-model="form.employee_id" />
-                </template>
-                <input type="hidden" v-model="form.location" />
-
-                <DialogFooter class="flex sm:justify-end gap-2 pt-4 border-t">
-                    <Button type="button" variant="outline" @click="closeDialog" :disabled="form.processing">
+                <div class="flex gap-2">
+                    <Button type="button" variant="outline" @click="closeDialog" :disabled="form.processing" class="pointer-events-auto">
                         Cancelar
                     </Button>
-                    <Button type="submit" :disabled="form.processing || isCheckedOut">
+                    <Button type="submit" :disabled="form.processing || isCheckedOut" class="min-w-[140px]">
                         {{ form.processing ? 'Guardando...' : 'Guardar Cambios' }}
                     </Button>
-                </DialogFooter>
-            </form>
-        </DialogContent>
-    </Dialog>
+                </div>
+            </DialogFooter>
+        </form>
+    </DialogContent>
+</Dialog>
 </template>
