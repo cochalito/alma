@@ -25,7 +25,7 @@ const emit = defineEmits<{
 
 const formatForInput = (dateStr: string) => {
     if (!dateStr) return '';
-    return dateStr.replace(' ', 'T').slice(0, 16);
+    return dateStr.slice(0, 10);
 };
 
 const page = usePage<AppPageProps>();
@@ -161,6 +161,27 @@ function recalculateExtraCost() {
     form.total_extra_cost = form.products.reduce((acc, curr) => acc + curr.subtotal, 0);
 }
 
+const nightlyCost = ref<number | string>('');
+
+const stayNights = computed(() => {
+    if (!form.check_in || !form.check_out) return 0;
+    const start = new Date(form.check_in);
+    const end = new Date(form.check_out);
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    return 0;
+});
+
+watch([nightlyCost, stayNights], ([nc, nights]) => {
+    if (nc !== '') {
+        form.total_stay_cost = Number((Number(nc) * (nights > 0 ? nights : 1)).toFixed(2));
+    } else {
+        form.total_stay_cost = 0;
+    }
+});
+
 // Update form when reservation changes
 watch([() => props.reservation, () => props.open], ([newVal, isOpen]) => {
     if (isOpen) {
@@ -183,13 +204,32 @@ watch([() => props.reservation, () => props.open], ([newVal, isOpen]) => {
                 unit_price: p.pivot.unit_price,
                 subtotal: p.pivot.subtotal,
             })) : [];
+
+            const start = new Date(newVal.check_in.slice(0, 10));
+            const end = new Date(newVal.check_out.slice(0, 10));
+            let nights = 0;
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end) {
+                nights = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            }
+            if (nights > 0) {
+                nightlyCost.value = Number((newVal.total_stay_cost / nights).toFixed(2));
+            } else {
+                nightlyCost.value = newVal.total_stay_cost;
+            }
         } else {
             form.reset();
             form.location = props.defaultLocation;
             form.employee_id = page.props.auth.user.id;
             form.products = [];
             localCustomers.value = [...props.customers];
+            nightlyCost.value = '';
         }
+        
+        // Reset purely visual UI states on open
+        customerSearch.value = '';
+        showCustomerDropdown.value = false;
+        cancelAddCustomer();
+        
         form.clearErrors();
     }
 }, { immediate: true });
@@ -200,29 +240,10 @@ watch(() => form.departament_id, (deptId) => {
         const dept = props.departments.find(d => d.id === deptId);
         if (dept) {
             form.location = dept.location;
+            if (!props.reservation && dept.cost) { // only on new reservation, set nightly cost to department cost
+                nightlyCost.value = dept.cost;
+            }
         }
-    }
-});
-
-// Recalculate cost when dates or department change
-watch([() => form.departament_id, () => form.check_in, () => form.check_out], ([deptId, checkIn, checkOut]) => {
-    // Only auto-calc if creating a new reservation
-    if (props.reservation) return;
-
-    if (!deptId || !checkIn || !checkOut) return;
-
-    const dept = props.departments.find(d => d.id === deptId);
-    if (!dept || !dept.cost) return; // If dept doesn't have a suggested cost, we don't overwrite
-
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-
-    // Calculate nights difference
-    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start < end) {
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        form.total_stay_cost = Number((diffDays * dept.cost).toFixed(2));
     }
 });
 
@@ -309,7 +330,7 @@ function submit() {
                     
                     <!-- PRIMERA COLUMNA: Datos principales -->
                     <div class="space-y-6">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" v-if="!reservation">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div class="flex flex-col gap-1.5">
                         <div class="flex items-center justify-between">
                             <label class="text-sm font-medium">Huésped <span class="text-destructive">*</span></label>
@@ -334,7 +355,7 @@ function submit() {
                                     <Input v-model="qcForm.document_number" placeholder="Documento" class="h-8 text-xs" />
                                 </div>
                                 <div>
-                                    <Input v-model="qcForm.email" type="email" placeholder="Correo *" class="h-8 text-xs" />
+                                    <Input v-model="qcForm.email" type="email" placeholder="Correo" class="h-8 text-xs" />
                                     <p v-if="qcErrors.email" class="text-[10px] text-destructive mt-0.5">{{ qcErrors.email[0] }}</p>
                                 </div>
                             </div>
@@ -385,19 +406,21 @@ function submit() {
                         <p v-if="form.errors.employee_id" class="text-xs text-destructive">{{ form.errors.employee_id }}</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Check-in -->
+                <div class="grid grid-cols-1 gap-4">
+                    <!-- Fechas de Estadía -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-sm font-medium">Check-in <span class="text-destructive">*</span></label>
-                        <Input v-model="form.check_in" type="datetime-local" required />
-                        <p v-if="form.errors.check_in" class="text-xs text-destructive">{{ form.errors.check_in }}</p>
-                    </div>
-
-                    <!-- Check-out -->
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-sm font-medium">Check-out <span class="text-destructive">*</span></label>
-                        <Input v-model="form.check_out" type="datetime-local" required />
-                        <p v-if="form.errors.check_out" class="text-xs text-destructive">{{ form.errors.check_out }}</p>
+                        <label class="text-sm font-medium">Fechas de Estadía (Ingreso - Salida) <span class="text-destructive">*</span></label>
+                        <div class="flex items-center rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 h-10">
+                            <input v-model="form.check_in" type="date" required class="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none h-full min-w-0" />
+                            <div class="flex items-center justify-center px-3 h-full border-x border-input bg-muted/30 text-muted-foreground">
+                                <span class="text-xs font-medium uppercase">Hasta</span>
+                            </div>
+                            <input v-model="form.check_out" type="date" required class="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none h-full min-w-0" />
+                        </div>
+                        <div v-if="form.errors.check_in || form.errors.check_out" class="flex flex-col gap-1 mt-0.5">
+                            <p v-if="form.errors.check_in" class="text-xs text-destructive">{{ form.errors.check_in }}</p>
+                            <p v-if="form.errors.check_out" class="text-xs text-destructive">{{ form.errors.check_out }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -464,12 +487,20 @@ function submit() {
                     </div>
                 </div>
 
-                        <div class="flex justify-end mt-2 mb-2">
+                        <div class="flex flex-col gap-3 mt-2 mb-2 items-end">
                             <div class="w-full sm:w-80">
                                 <div class="flex justify-between items-center text-sm gap-4">
-                                    <label class="font-medium text-right flex-1">Costo de Estadía (Bs.) <span class="text-destructive">*</span></label>
+                                    <label class="font-medium text-right flex-1">Costo por Noche (Bs.) <span class="text-destructive">*</span></label>
                                     <div class="w-32 shrink-0">
-                                        <Input v-model="form.total_stay_cost" type="number" step="0.01" required class="h-9 text-right font-bold text-primary" />
+                                        <Input v-model="nightlyCost" type="number" step="0.01" required class="h-9 text-right font-medium" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="w-full sm:w-80 bg-muted/10 p-3 pt-2 pb-2 rounded-lg border border-border">
+                                <div class="flex justify-between items-center text-sm gap-4">
+                                    <label class="font-medium flex-1 text-muted-foreground">Costo de Estadía <span class="text-[10px] font-semibold tracking-wider uppercase ml-1 opacity-70">({{ stayNights }} Noche{{ stayNights !== 1 ? 's' : '' }})</span></label>
+                                    <div class="w-32 shrink-0 text-right">
+                                        <span class="font-bold text-primary tabular-nums">Bs. {{ Number(form.total_stay_cost).toFixed(2) }}</span>
                                     </div>
                                 </div>
                                 <p v-if="form.errors.total_stay_cost" class="text-xs text-destructive text-right mt-1">{{ form.errors.total_stay_cost }}</p>
@@ -545,7 +576,6 @@ function submit() {
                     </div>
                     <div class="hidden">
                         <template v-if="reservation">
-                            <input type="hidden" v-model="form.customer_id" />
                             <input type="hidden" v-model="form.employee_id" />
                         </template>
                         <input type="hidden" v-model="form.location" />

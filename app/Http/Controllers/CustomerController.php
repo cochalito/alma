@@ -53,10 +53,14 @@ class CustomerController extends Controller
             'document_number' => 'nullable|string|max:255',
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
-            'email' => 'required|email|max:150',
+            'email' => 'nullable|email|max:150',
             'cellphone' => 'nullable|string|max:50',
             'status' => 'required|in:0,1',
         ]);
+
+        if (empty($validated['email'])) {
+            $validated['email'] = 'huesped@almudeanhotel.com';
+        }
 
         Customer::create($validated);
 
@@ -68,10 +72,15 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
-            'email' => 'required|email|max:150',
+            'email' => 'nullable|email|max:150',
             'cellphone' => 'nullable|string|max:50',
             'document_number' => 'nullable|string|max:255',
         ]);
+
+        if (empty($validated['email'])) {
+            $validated['email'] = 'huesped@almudeanhotel.com';
+        }
+
         $validated['status'] = '1';
 
         $customer = Customer::create($validated);
@@ -93,10 +102,14 @@ class CustomerController extends Controller
             'document_number' => 'nullable|string|max:255',
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
-            'email' => 'required|email|max:150',
+            'email' => 'nullable|email|max:150',
             'cellphone' => 'nullable|string|max:50',
             'status' => 'required|in:0,1',
         ]);
+
+        if (empty($validated['email'])) {
+            $validated['email'] = 'huesped@almudeanhotel.com';
+        }
 
         $customer->update($validated);
 
