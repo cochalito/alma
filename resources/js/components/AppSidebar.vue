@@ -47,6 +47,11 @@ const hotelItems: NavItem[] = [
         icon: Ship,
     },
     {
+        title: 'Venta Externa',
+        href: '/admin/external-sales',
+        icon: Coffee,
+    },
+    {
         title: 'Huéspedes',
         href: '/admin/customers',
         icon: Users,
@@ -107,7 +112,7 @@ function hasAccess(menuTitle: string): boolean {
     }
 
     if (role.startsWith('RECEPCIONISTA')) {
-        return ['Panel de Control', 'Reservaciones', 'Charter', 'Huéspedes', 'Reporte de Productos'].includes(menuTitle);
+        return ['Panel de Control', 'Reservaciones', 'Charter', 'Venta Externa', 'Huéspedes', 'Reporte de Productos'].includes(menuTitle);
     }
 
     return false;

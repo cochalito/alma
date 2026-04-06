@@ -170,7 +170,7 @@ class ReportController extends Controller
         }
         $locations = $locationsQuery->pluck('location');
 
-        $query = \Illuminate\Support\Facades\DB::table('reservation_product')
+        $query1 = \Illuminate\Support\Facades\DB::table('reservation_product')
             ->join('reservations', 'reservation_product.reservation_id', '=', 'reservations.id')
             ->join('products', 'reservation_product.product_id', '=', 'products.id')
             ->leftJoin('customers', 'reservations.customer_id', '=', 'customers.id')
@@ -185,30 +185,56 @@ class ReportController extends Controller
                 'reservation_product.unit_price',
                 'reservation_product.subtotal'
             )
-            ->where('reservations.status', '!=', '4')
-            ->orderBy('reservations.created_at', 'desc');
+            ->where('reservations.status', '!=', '4');
+
+        $query2 = \Illuminate\Support\Facades\DB::table('inventory_movements')
+            ->join('products', 'inventory_movements.product_id', '=', 'products.id')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw('NULL as reservation_id'),
+                'inventory_movements.location',
+                'inventory_movements.created_at as sale_date',
+                \Illuminate\Support\Facades\DB::raw("'Venta' as firstname"),
+                \Illuminate\Support\Facades\DB::raw("'Externa' as lastname"),
+                'products.name as product_name',
+                'inventory_movements.quantity',
+                'products.price as unit_price',
+                \Illuminate\Support\Facades\DB::raw('(inventory_movements.quantity * products.price) as subtotal')
+            )
+            ->where('inventory_movements.type', 'out')
+            ->where('inventory_movements.description', 'Venta Directa Externa');
 
         if ($location) {
-            $query->where('reservations.location', $location);
+            $query1->where('reservations.location', $location);
+            $query2->where('inventory_movements.location', $location);
         }
 
         if ($dateFrom) {
-            $query->whereDate('reservations.created_at', '>=', $dateFrom);
+            $query1->whereDate('reservations.created_at', '>=', $dateFrom);
+            $query2->whereDate('inventory_movements.created_at', '>=', $dateFrom);
         } else {
             // Default to start of current month
-            $query->whereDate('reservations.created_at', '>=', Carbon::now()->startOfMonth());
-            $dateFrom = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $query1->whereDate('reservations.created_at', '>=', $startOfMonth);
+            $query2->whereDate('inventory_movements.created_at', '>=', $startOfMonth);
+            $dateFrom = $startOfMonth;
         }
 
         if ($dateTo) {
-            $query->whereDate('reservations.created_at', '<=', $dateTo);
+            $query1->whereDate('reservations.created_at', '<=', $dateTo);
+            $query2->whereDate('inventory_movements.created_at', '<=', $dateTo);
         } else {
             // Default to end of current month
-            $query->whereDate('reservations.created_at', '<=', Carbon::now()->endOfMonth());
-            $dateTo = Carbon::now()->endOfMonth()->format('Y-m-d');
+            $endOfMonth = Carbon::now()->endOfMonth()->format('Y-m-d');
+            $query1->whereDate('reservations.created_at', '<=', $endOfMonth);
+            $query2->whereDate('inventory_movements.created_at', '<=', $endOfMonth);
+            $dateTo = $endOfMonth;
         }
 
-        $sales = $query->get()->map(function ($item) {
+        $query1->unionAll($query2);
+        
+        $salesList = $query1->get()->sortByDesc('sale_date')->values();
+
+        $sales = $salesList->map(function ($item) {
             return [
                 'reservation_id' => $item->reservation_id,
                 'location' => $item->location,

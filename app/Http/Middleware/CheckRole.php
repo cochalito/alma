@@ -34,7 +34,7 @@ class CheckRole
         }
 
         if (str_starts_with($role, 'RECEPCIONISTA')) {
-            $allowed = ['reservations', 'charter', 'customers', 'reports/kardex', 'dashboard'];
+            $allowed = ['reservations', 'charter', 'customers', 'reports/kardex', 'dashboard', 'external-sales'];
             $canAccess = false;
             foreach ($allowed as $a) {
                 if (str_contains($path, $a)) {

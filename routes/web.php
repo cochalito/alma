@@ -173,6 +173,7 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\CheckRole::class])->
     Route::resource('products', ProductController::class);
     Route::resource('reservations', ReservationController::class);
     Route::get('reservations/{reservation}/print', [ReservationController::class, 'print'])->name('reservations.print');
+    Route::resource('external-sales', \App\Http\Controllers\ExternalSaleController::class)->only(['index', 'store']);
     Route::get('charter', [CharterController::class, 'index'])->name('charter.index');
     Route::get('reports/reservations', [\App\Http\Controllers\ReportController::class, 'reservations'])->name('reports.reservations');
     Route::get('reports/sales', [\App\Http\Controllers\ReportController::class, 'sales'])->name('reports.sales');

@@ -153,8 +153,13 @@ function printReport() {
                                 <td class="px-4 py-3 text-xs whitespace-nowrap">{{ formatDate(sale.sale_date) }}</td>
                                 <td class="px-4 py-3">{{ sale.location }}</td>
                                 <td class="px-4 py-3">
-                                    <div class="font-medium text-xs">#{{ String(sale.reservation_id).padStart(5, '0') }}</div>
-                                    <div class="text-xs text-muted-foreground print:text-gray-600">{{ sale.customer_name || 'Desconocido' }}</div>
+                                    <template v-if="sale.reservation_id">
+                                        <div class="font-medium text-xs">#{{ String(sale.reservation_id).padStart(5, '0') }}</div>
+                                        <div class="text-xs text-muted-foreground print:text-gray-600">{{ sale.customer_name || 'Desconocido' }}</div>
+                                    </template>
+                                    <template v-else>
+                                        <div class="font-bold text-xs">{{ sale.customer_name }}</div>
+                                    </template>
                                 </td>
                                 <td class="px-4 py-3 font-medium uppercase text-xs">{{ sale.product_name }}</td>
                                 <td class="px-4 py-3 text-right">{{ sale.quantity }}</td>
