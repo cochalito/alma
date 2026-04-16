@@ -13,7 +13,7 @@ class ReservationController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Reservation::with(['employee', 'departament', 'customer', 'products']);
+        $query = Reservation::with(['employee', 'departament', 'customer', 'products', 'payments']);
 
         // Role-based Location Filtering
         $user = auth()->user();
@@ -236,7 +236,7 @@ class ReservationController extends Controller
 
     public function edit(Reservation $reservation)
     {
-        $reservation->load(['employee', 'departament', 'customer', 'products']);
+        $reservation->load(['employee', 'departament', 'customer', 'products', 'payments']);
 
         $departmentsQuery = Departament::query();
         $user = auth()->user();
@@ -303,6 +303,16 @@ class ReservationController extends Controller
 
             if ($overlapping) {
                 $validator->errors()->add('departament_id', 'Este departamento ya cuenta con una reservación cruzada para las mismas fechas editadas.');
+            }
+
+            // Validation: Cannot Checkout if there is balance due
+            if ($request->status === '3') {
+                $totalCost = (float)$request->total_stay_cost + (float)$request->total_extra_cost;
+                $totalPaid = (float)$reservation->payments()->sum('amount');
+                
+                if ($totalPaid < ($totalCost - 0.01)) {
+                    $validator->errors()->add('status', 'No se puede realizar Check Out porque aún existe un saldo pendiente de Bs. ' . number_format($totalCost - $totalPaid, 2));
+                }
             }
         });
 

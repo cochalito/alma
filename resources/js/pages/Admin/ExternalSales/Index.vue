@@ -48,6 +48,7 @@ const saleForm = useForm({
     product_id: null as number | null,
     location: props.allowedLocation || 'UYUNI',
     quantity: 1,
+    payment_method: 'EFECTIVO',
 });
 
 function openSaleModal(product: ProductWithLocations) {
@@ -55,6 +56,7 @@ function openSaleModal(product: ProductWithLocations) {
     saleForm.product_id = product.id;
     saleForm.location = props.allowedLocation || 'UYUNI';
     saleForm.quantity = 1;
+    saleForm.payment_method = 'EFECTIVO';
     isSaleModalOpen.value = true;
 }
 
@@ -289,6 +291,19 @@ function clearFilters() {
                                 Stock disponible: {{ selectedProduct ? getStockAt(selectedProduct, saleForm.location) : 0 }}
                             </p>
                             <p v-if="saleForm.errors.quantity" class="text-xs text-destructive">{{ saleForm.errors.quantity }}</p>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Tipo de Pago</label>
+                            <select
+                                v-model="saleForm.payment_method"
+                                class="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                                <option value="EFECTIVO">EFECTIVO</option>
+                                <option value="QR">QR</option>
+                                <option value="TARJETA">TARJETA</option>
+                            </select>
+                            <p v-if="saleForm.errors.payment_method" class="text-xs text-destructive">{{ saleForm.errors.payment_method }}</p>
                         </div>
 
                         <div class="mt-4 pt-4 border-t border-border space-y-1.5 font-bold text-xl text-right">

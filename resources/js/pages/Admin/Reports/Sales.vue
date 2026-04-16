@@ -15,6 +15,7 @@ interface Sale {
     quantity: number;
     unit_price: number;
     subtotal: number;
+    payment_method: string | null;
 }
 
 interface Props {
@@ -28,6 +29,10 @@ interface Props {
     summary: {
         total_items: number;
         total_revenue: number;
+        total_efectivo: number;
+        total_qr: number;
+        total_tarjeta: number;
+        total_cargado: number;
     };
 }
 
@@ -141,6 +146,7 @@ function printReport() {
                                 <th class="px-4 py-3 font-semibold text-right">Cant.</th>
                                 <th class="px-4 py-3 font-semibold text-right">Precio Un.</th>
                                 <th class="px-4 py-3 font-semibold text-right">Subtotal</th>
+                                <th class="px-4 py-3 font-semibold">Tipo Pago</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -165,14 +171,44 @@ function printReport() {
                                 <td class="px-4 py-3 text-right">{{ sale.quantity }}</td>
                                 <td class="px-4 py-3 text-right">{{ formatCurrency(sale.unit_price) }}</td>
                                 <td class="px-4 py-3 text-right font-medium">{{ formatCurrency(sale.subtotal) }}</td>
+                                <td class="px-4 py-3">
+                                    <span v-if="sale.payment_method" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted/60 border border-border">
+                                        {{ sale.payment_method }}
+                                    </span>
+                                    <span v-else class="text-[10px] text-muted-foreground italic">Cargado a Hab.</span>
+                                </td>
                             </tr>
                         </tbody>
                         <tfoot class="bg-primary/5 print:bg-gray-100 border-t-2 border-border print:border-gray-400">
-                            <tr>
-                                <td colspan="4" class="px-4 py-3 text-right font-bold uppercase text-xs">Totales Generales</td>
-                                <td class="px-4 py-3 text-right font-bold">{{ summary.total_items }}</td>
+                            <!-- Pago Efectivo -->
+                            <tr class="border-b border-border/50">
+                                <td colspan="6" class="px-4 py-2 text-right font-semibold text-xs text-muted-foreground uppercase">Total Efectivo</td>
+                                <td class="px-4 py-2 text-right font-bold text-green-700 dark:text-green-500">{{ formatCurrency(summary.total_efectivo) }}</td>
                                 <td></td>
-                                <td class="px-4 py-3 text-right font-bold text-primary print:text-black text-base">{{ formatCurrency(summary.total_revenue) }}</td>
+                            </tr>
+                            <!-- Pago QR -->
+                            <tr class="border-b border-border/50">
+                                <td colspan="6" class="px-4 py-2 text-right font-semibold text-xs text-muted-foreground uppercase">Total QR</td>
+                                <td class="px-4 py-2 text-right font-bold text-blue-700 dark:text-blue-500">{{ formatCurrency(summary.total_qr) }}</td>
+                                <td></td>
+                            </tr>
+                            <!-- Pago Tarjeta -->
+                            <tr class="border-b border-border/50">
+                                <td colspan="6" class="px-4 py-2 text-right font-semibold text-xs text-muted-foreground uppercase">Total Tarjeta</td>
+                                <td class="px-4 py-2 text-right font-bold text-purple-700 dark:text-purple-500">{{ formatCurrency(summary.total_tarjeta) }}</td>
+                                <td></td>
+                            </tr>
+                            <!-- Cargado a Habitación -->
+                            <tr v-if="summary.total_cargado > 0" class="border-b border-border/50">
+                                <td colspan="6" class="px-4 py-2 text-right font-semibold text-xs text-muted-foreground uppercase">Total Cargado a Hab.</td>
+                                <td class="px-4 py-2 text-right font-bold text-orange-700 dark:text-orange-500">{{ formatCurrency(summary.total_cargado) }}</td>
+                                <td></td>
+                            </tr>
+                            <!-- TOTAL GENERAL -->
+                            <tr class="bg-primary/10">
+                                <td colspan="6" class="px-4 py-4 text-right font-black uppercase text-sm tracking-widest text-primary">Total General de Ventas</td>
+                                <td class="px-4 py-4 text-right font-black text-primary text-xl">{{ formatCurrency(summary.total_revenue) }}</td>
+                                <td></td>
                             </tr>
                         </tfoot>
                     </table>

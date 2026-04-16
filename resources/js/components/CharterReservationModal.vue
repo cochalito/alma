@@ -4,9 +4,11 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import { type Reservation, type Departament, type User, type Product, type Customer, type AppPageProps } from '@/types';
 import axios from 'axios';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, AlertTriangle, Lock, Printer } from 'lucide-vue-next';
+import { Plus, Trash2, AlertTriangle, Lock, Printer, Banknote, QrCode, CreditCard, ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { router } from '@inertiajs/vue3';
 
 interface Props {
     open: boolean;
@@ -22,6 +24,72 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
     (e: 'update:open', value: boolean): void;
 }>();
+
+// Payment management state
+const paymentForm = useForm({
+    amount: 0,
+    payment_method: 'EFECTIVO',
+    description: '',
+});
+
+const totalPaid = computed(() => {
+    if (!props.reservation?.payments) return 0;
+    return props.reservation.payments.reduce((acc: number, p: any) => acc + Number(p.amount), 0);
+});
+
+const balanceDue = computed(() => {
+    if (!props.reservation) return 0;
+    const totalDue = Number(form.total_stay_cost) + Number(form.total_extra_cost);
+    return Number((totalDue - totalPaid.value).toFixed(2));
+});
+
+const isPaymentsExpanded = ref(false);
+
+watch(() => props.open, (isOpen) => {
+    if (isOpen && props.reservation) {
+        // Pre-fill amount with balance due when opening modal for existing reservation
+        paymentForm.amount = balanceDue.value > 0 ? balanceDue.value : 0;
+        
+        // Start expanded if already checked out, otherwise collapsed
+        isPaymentsExpanded.value = props.reservation.status === '3';
+    }
+});
+
+// Auto-update payment amount when balance changes (e.g. adding products)
+watch(balanceDue, (newBalance) => {
+    if (newBalance > 0) {
+        paymentForm.amount = newBalance;
+    } else {
+        paymentForm.amount = 0;
+    }
+});
+
+function submitPayment() {
+    if (!props.reservation) return;
+    if (paymentForm.amount <= 0) return;
+
+    if (paymentForm.amount > balanceDue.value + 0.01) {
+        alert(`El monto no puede ser mayor al saldo pendiente (Bs. ${balanceDue.value})`);
+        return;
+    }
+
+    paymentForm.post(`/admin/reservations/${props.reservation.id}/payments`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            paymentForm.reset('amount', 'description');
+            paymentForm.payment_method = 'EFECTIVO';
+        },
+    });
+}
+
+function deletePayment(id: number) {
+    if (!confirm('¿Estás seguro de que deseas eliminar este pago?')) return;
+    
+    router.delete(`/admin/payments/${id}`, {
+        preserveScroll: true
+    });
+}
+
 
 const formatForInput = (dateStr: string) => {
     if (!dateStr) return '';
@@ -131,17 +199,19 @@ function addProduct() {
     if (!product) return;
 
     // Check if already added
-    const existing = form.products.find(p => p.product_id === product.id);
+    const existing = form.products.find(p => Number(p.product_id) === Number(product.id));
+    const qtyToAdd = Number(selectedQuantity.value);
+
     if (existing) {
-        existing.quantity += selectedQuantity.value;
-        existing.subtotal = existing.quantity * existing.unit_price;
+        existing.quantity = Number(existing.quantity) + qtyToAdd;
+        existing.subtotal = Number((existing.quantity * existing.unit_price).toFixed(2));
     } else {
         form.products.push({
             product_id: product.id,
             name: product.name,
-            quantity: selectedQuantity.value,
-            unit_price: product.price,
-            subtotal: selectedQuantity.value * product.price,
+            quantity: qtyToAdd,
+            unit_price: Number(product.price),
+            subtotal: Number((qtyToAdd * product.price).toFixed(2)),
         });
     }
 
@@ -158,7 +228,8 @@ function removeProduct(index: number) {
 }
 
 function recalculateExtraCost() {
-    form.total_extra_cost = form.products.reduce((acc, curr) => acc + curr.subtotal, 0);
+    const total = form.products.reduce((acc, curr) => acc + Number(curr.subtotal), 0);
+    form.total_extra_cost = Number(total.toFixed(2));
 }
 
 const nightlyCost = ref<number | string>('');
@@ -192,8 +263,8 @@ watch([() => props.reservation, () => props.open], ([newVal, isOpen]) => {
             form.location = newVal.location;
             form.check_in = formatForInput(newVal.check_in);
             form.check_out = formatForInput(newVal.check_out);
-            form.total_stay_cost = newVal.total_stay_cost;
-            form.total_extra_cost = newVal.total_extra_cost;
+            form.total_stay_cost = Number(newVal.total_stay_cost);
+            form.total_extra_cost = Number(Number(newVal.total_extra_cost).toFixed(2));
             form.requests = newVal.requests ?? '';
             form.comments = newVal.comments ?? '';
             form.status = newVal.status;
@@ -216,6 +287,9 @@ watch([() => props.reservation, () => props.open], ([newVal, isOpen]) => {
             } else {
                 nightlyCost.value = newVal.total_stay_cost;
             }
+
+            // Important: recalculate to fix any imprecision stored in DB
+            recalculateExtraCost();
         } else {
             form.reset();
             form.location = props.defaultLocation;
@@ -258,7 +332,14 @@ function handleStatusChange(event: Event) {
     const select = event.target as HTMLSelectElement;
     const newValue = select.value;
     if (newValue === '3' && form.status !== '3') {
-        // Revert the visual selection
+        // Prevent checkout if there is balance due
+        if (balanceDue.value > 0.01) {
+            alert(`ATENCIÓN: No se puede realizar Check Out porque aún existe un saldo pendiente de Bs. ${balanceDue.value.toFixed(2)}. Por favor, registre el pago total antes de continuar.`);
+            select.value = form.status; // Revert selection
+            return;
+        }
+
+        // Revert the visual selection (confirmation will handle the change)
         select.value = form.status;
         pendingCheckoutStatus.value = '3';
         showCheckoutConfirm.value = true;
@@ -305,7 +386,7 @@ function submit() {
 
 <template>
     <Dialog :open="open" @update:open="$emit('update:open', $event)">
-        <DialogContent class="sm:max-w-[1100px] w-[95vw] md:w-[90vw] bg-card text-card-foreground">
+        <DialogContent class="sm:max-w-[1100px] w-[95vw] md:w-[90vw] max-h-[95vh] overflow-y-auto bg-card text-card-foreground">
             <DialogHeader>
                 <DialogTitle class="text-xl">
                     {{ reservation ? 'Editar Reservación' : 'Nueva Reservación' }}
@@ -564,7 +645,7 @@ function submit() {
                             <div class="flex justify-between items-center text-sm gap-4">
                                 <span class="font-medium text-muted-foreground text-right flex-1">Costos Extras:</span>
                                 <div class="w-32 shrink-0">
-                                    <Input :model-value="form.total_extra_cost" readonly tabindex="-1" class="h-8 text-right font-medium bg-muted opacity-80" />
+                                    <Input :model-value="Number(form.total_extra_cost).toFixed(2)" readonly tabindex="-1" class="h-8 text-right font-medium bg-muted opacity-80" />
                                 </div>
                             </div>
                             <!-- Grand Total -->
@@ -582,6 +663,128 @@ function submit() {
                     </div>
                 </div> <!-- Termina Segunda Columna -->
             </div> <!-- Termina Grid Principal -->
+            
+            <!-- SECCIÓN DE PAGOS (Solo para Reservas Existentes) -->
+            <div v-if="reservation" class="mt-4 rounded-xl border border-blue-200 bg-blue-50/30 dark:bg-blue-950/20 dark:border-blue-900/50 overflow-hidden">
+                <button 
+                    type="button" 
+                    @click="isPaymentsExpanded = !isPaymentsExpanded"
+                    class="w-full flex items-center justify-between p-4 hover:bg-blue-100/30 transition-colors"
+                >
+                    <div class="flex items-center gap-3">
+                        <Banknote class="h-5 w-5 text-blue-600" />
+                        <h3 class="text-lg font-bold">Control de Pagos</h3>
+                        <Badge v-if="!isPaymentsExpanded" :variant="balanceDue <= 0 ? 'secondary' : 'default'" class="ml-2">
+                             Saldo: Bs. {{ balanceDue.toFixed(2) }}
+                        </Badge>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-blue-600/70 uppercase">
+                            {{ isPaymentsExpanded ? 'Contraer' : 'Gestionar Pagos' }}
+                        </span>
+                        <ChevronUp v-if="isPaymentsExpanded" class="h-5 w-5 text-blue-600" />
+                        <ChevronDown v-else class="h-5 w-5 text-blue-600" />
+                    </div>
+                </button>
+
+                <div v-if="isPaymentsExpanded" class="p-5 pt-0">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 border-t border-blue-100 dark:border-blue-900/30 pt-5">
+                    <!-- Historial de Pagos -->
+                    <div class="lg:col-span-2 space-y-3">
+                        <h4 class="text-xs font-bold uppercase text-muted-foreground tracking-wider">Historial de Pagos</h4>
+                        <div v-if="reservation.payments && reservation.payments.length > 0" class="rounded-lg border bg-background overflow-hidden">
+                            <table class="w-full text-sm">
+                                <thead class="bg-muted/50 text-xs">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left font-semibold">Fecha</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Método</th>
+                                        <th class="px-3 py-2 text-left font-semibold">Nota</th>
+                                        <th class="px-3 py-2 text-right font-semibold">Monto</th>
+                                        <th class="px-3 py-2 text-center w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="payment in reservation.payments" :key="payment.id" class="border-t hover:bg-muted/30 transition-colors">
+                                        <td class="px-3 py-2 text-xs text-muted-foreground">
+                                            {{ new Date(payment.created_at).toLocaleDateString('es-BO') }}
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <span class="inline-flex items-center gap-1.5 text-xs font-semibold">
+                                                <Banknote v-if="payment.payment_method === 'EFECTIVO'" class="h-3 w-3 text-green-600" />
+                                                <QrCode v-else-if="payment.payment_method === 'QR'" class="h-3 w-3 text-blue-600" />
+                                                <CreditCard v-else class="h-3 w-3 text-purple-600" />
+                                                {{ payment.payment_method }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 text-xs italic">{{ payment.description || '-' }}</td>
+                                        <td class="px-3 py-2 text-right font-bold">Bs. {{ Number(payment.amount).toFixed(2) }}</td>
+                                        <td class="px-3 py-2 text-center">
+                                            <button type="button" @click="deletePayment(payment.id)" class="text-destructive hover:scale-110 transition-transform">
+                                                <Trash2 class="h-4 w-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot class="bg-muted/20 font-bold border-t">
+                                    <tr>
+                                        <td colspan="3" class="px-3 py-2 text-right uppercase text-xs">Total Pagado:</td>
+                                        <td class="px-3 py-2 text-right text-green-700 dark:text-green-500">Bs. {{ totalPaid.toFixed(2) }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div v-else class="flex flex-col items-center justify-center py-8 rounded-lg border border-dashed border-blue-200 bg-blue-50/20 text-blue-400">
+                            <Banknote class="h-10 w-10 mb-2 opacity-20" />
+                            <p class="text-sm italic">No se han registrado pagos aún.</p>
+                        </div>
+                    </div>
+
+                    <!-- Agregar Pago y Saldo -->
+                    <div class="space-y-4">
+                        <div class="p-4 rounded-lg bg-background border border-blue-100 shadow-sm space-y-3">
+                            <h4 class="text-xs font-bold uppercase text-muted-foreground tracking-wider">Registrar Nuevo Pago</h4>
+                            <form @submit.prevent="submitPayment" class="space-y-3">
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-medium">Monto (Bs.)</label>
+                                    <Input v-model="paymentForm.amount" type="number" step="0.01" min="0.01" required class="h-9" />
+                                    <p v-if="paymentForm.errors.amount" class="text-[10px] text-destructive italic mt-0.5">{{ paymentForm.errors.amount }}</p>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-medium">Método de Pago</label>
+                                    <select v-model="paymentForm.payment_method" class="w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-sm h-9">
+                                        <option value="EFECTIVO">EFECTIVO</option>
+                                        <option value="QR">QR</option>
+                                        <option value="TARJETA">TARJETA</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-medium">Descripción / Nota</label>
+                                    <Input v-model="paymentForm.description" placeholder="Ej: Pago parcial, Adelanto..." class="h-9" />
+                                </div>
+                                <Button type="submit" :disabled="paymentForm.processing || paymentForm.amount <= 0" class="w-full bg-blue-600 hover:bg-blue-700 text-white mt-1">
+                                    <Plus class="h-4 w-4 mr-2" />
+                                    {{ paymentForm.processing ? 'Procesando...' : 'Confirmar Pago' }}
+                                </Button>
+                            </form>
+                        </div>
+
+                        <!-- Resumen Financiero -->
+                        <div class="p-4 rounded-lg border-2" :class="balanceDue <= 0 ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900' : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900'">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold uppercase text-muted-foreground">Saldo Pendiente</span>
+                                <Badge :variant="balanceDue <= 0 ? 'secondary' : 'default'">
+                                    {{ balanceDue <= 0 ? 'Pagado Total' : 'Pendiente' }}
+                                </Badge>
+                            </div>
+                            <p class="text-3xl font-black mt-1" :class="balanceDue <= 0 ? 'text-green-600' : 'text-amber-600'">
+                                Bs. {{ balanceDue.toFixed(2) }}
+                            </p>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <DialogFooter class="flex gap-2 pt-4 border-t mt-4" :class="reservation && (reservation.status === '2' || reservation.status === '3') ? 'justify-between' : 'justify-end'">
                 <div v-if="reservation && (reservation.status === '2' || reservation.status === '3')">

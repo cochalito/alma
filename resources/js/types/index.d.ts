@@ -92,6 +92,16 @@ export interface Departament {
 
 export type ReservationStatus = '1' | '2' | '3' | '4'; // 1 Confirmado, 2 Check In, 3 Check Out, 4 Cancelado
 
+export interface ReservationPayment {
+    id: number;
+    reservation_id: number;
+    amount: number;
+    payment_method: 'EFECTIVO' | 'QR' | 'TARJETA';
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Reservation {
     id: number;
     employee_id: number;
@@ -109,6 +119,7 @@ export interface Reservation {
     departament?: Departament;
     customer?: Customer;
     products: ReservationProduct[];
+    payments?: ReservationPayment[];
     created_at: string;
     updated_at: string;
 }

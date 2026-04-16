@@ -41,4 +41,9 @@ class Reservation extends Model
             ->withPivot('quantity', 'unit_price', 'subtotal')
             ->withTimestamps();
     }
+
+    public function payments()
+    {
+        return $this->hasMany(ReservationPayment::class);
+    }
 }

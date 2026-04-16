@@ -172,6 +172,8 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\CheckRole::class])->
     Route::post('products/stock-adjustment', [ProductController::class, 'stockAdjustment'])->name('products.stock-adjustment');
     Route::resource('products', ProductController::class);
     Route::resource('reservations', ReservationController::class);
+    Route::post('reservations/{reservation}/payments', [\App\Http\Controllers\ReservationPaymentController::class, 'store'])->name('reservations.payments.store');
+    Route::delete('payments/{payment}', [\App\Http\Controllers\ReservationPaymentController::class, 'destroy'])->name('payments.destroy');
     Route::get('reservations/{reservation}/print', [ReservationController::class, 'print'])->name('reservations.print');
     Route::resource('external-sales', \App\Http\Controllers\ExternalSaleController::class)->only(['index', 'store']);
     Route::get('charter', [CharterController::class, 'index'])->name('charter.index');

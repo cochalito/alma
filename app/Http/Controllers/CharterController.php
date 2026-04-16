@@ -39,6 +39,7 @@ class CharterController extends Controller
         // Get reservations for those departments that overlap with this week
         $reservations = Reservation::with([
             'customer',
+            'payments',
             'products' => function ($query) {
                 $query->withPivot('quantity', 'unit_price', 'subtotal');
             }

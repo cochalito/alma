@@ -109,6 +109,16 @@ function openEditModal(res: Reservation) {
     activeReservation.value = res;
     isModalOpen.value = true;
 }
+
+// Keep activeReservation in sync with updated props (important for payments)
+watch(() => props.reservations.data, (newData) => {
+    if (activeReservation.value) {
+        const updated = newData.find(r => r.id === activeReservation.value?.id);
+        if (updated) {
+            activeReservation.value = updated;
+        }
+    }
+}, { deep: true });
 </script>
 
 <template>

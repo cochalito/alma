@@ -181,56 +181,75 @@ class ReportController extends Controller
                 'customers.firstname',
                 'customers.lastname',
                 'products.name as product_name',
-                'reservation_product.quantity',
+                \Illuminate\Support\Facades\DB::raw('CAST(reservation_product.quantity AS UNSIGNED) as quantity'),
                 'reservation_product.unit_price',
-                'reservation_product.subtotal'
+                'reservation_product.subtotal',
+                \Illuminate\Support\Facades\DB::raw("NULL as payment_method")
             )
             ->where('reservations.status', '!=', '4');
 
-        $query2 = \Illuminate\Support\Facades\DB::table('inventory_movements')
-            ->join('products', 'inventory_movements.product_id', '=', 'products.id')
+        $query2 = \Illuminate\Support\Facades\DB::table('external_sales')
+            ->join('products', 'external_sales.product_id', '=', 'products.id')
             ->select(
                 \Illuminate\Support\Facades\DB::raw('NULL as reservation_id'),
-                'inventory_movements.location',
-                'inventory_movements.created_at as sale_date',
+                'external_sales.location',
+                'external_sales.created_at as sale_date',
                 \Illuminate\Support\Facades\DB::raw("'Venta' as firstname"),
                 \Illuminate\Support\Facades\DB::raw("'Externa' as lastname"),
                 'products.name as product_name',
-                'inventory_movements.quantity',
-                'products.price as unit_price',
-                \Illuminate\Support\Facades\DB::raw('(inventory_movements.quantity * products.price) as subtotal')
-            )
-            ->where('inventory_movements.type', 'out')
-            ->where('inventory_movements.description', 'Venta Directa Externa');
+                \Illuminate\Support\Facades\DB::raw('CAST(external_sales.quantity AS UNSIGNED) as quantity'),
+                'external_sales.unit_price',
+                'external_sales.total_price as subtotal',
+                'external_sales.payment_method'
+            );
+
+        $query3 = \Illuminate\Support\Facades\DB::table('reservation_payments')
+            ->join('reservations', 'reservation_payments.reservation_id', '=', 'reservations.id')
+            ->leftJoin('customers', 'reservations.customer_id', '=', 'customers.id')
+            ->select(
+                'reservations.id as reservation_id',
+                'reservations.location',
+                'reservation_payments.created_at as sale_date',
+                'customers.firstname',
+                'customers.lastname',
+                \Illuminate\Support\Facades\DB::raw("CONCAT('PAGO RESERVA #', reservations.id) as product_name"),
+                \Illuminate\Support\Facades\DB::raw('1 as quantity'),
+                'reservation_payments.amount as unit_price',
+                'reservation_payments.amount as subtotal',
+                'reservation_payments.payment_method'
+            );
 
         if ($location) {
             $query1->where('reservations.location', $location);
-            $query2->where('inventory_movements.location', $location);
+            $query2->where('external_sales.location', $location);
+            $query3->where('reservations.location', $location);
         }
 
         if ($dateFrom) {
             $query1->whereDate('reservations.created_at', '>=', $dateFrom);
-            $query2->whereDate('inventory_movements.created_at', '>=', $dateFrom);
+            $query2->whereDate('external_sales.created_at', '>=', $dateFrom);
+            $query3->whereDate('reservation_payments.created_at', '>=', $dateFrom);
         } else {
-            // Default to start of current month
             $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d');
             $query1->whereDate('reservations.created_at', '>=', $startOfMonth);
-            $query2->whereDate('inventory_movements.created_at', '>=', $startOfMonth);
+            $query2->whereDate('external_sales.created_at', '>=', $startOfMonth);
+            $query3->whereDate('reservation_payments.created_at', '>=', $startOfMonth);
             $dateFrom = $startOfMonth;
         }
 
         if ($dateTo) {
             $query1->whereDate('reservations.created_at', '<=', $dateTo);
-            $query2->whereDate('inventory_movements.created_at', '<=', $dateTo);
+            $query2->whereDate('external_sales.created_at', '<=', $dateTo);
+            $query3->whereDate('reservation_payments.created_at', '<=', $dateTo);
         } else {
-            // Default to end of current month
             $endOfMonth = Carbon::now()->endOfMonth()->format('Y-m-d');
             $query1->whereDate('reservations.created_at', '<=', $endOfMonth);
-            $query2->whereDate('inventory_movements.created_at', '<=', $endOfMonth);
+            $query2->whereDate('external_sales.created_at', '<=', $endOfMonth);
+            $query3->whereDate('reservation_payments.created_at', '<=', $endOfMonth);
             $dateTo = $endOfMonth;
         }
 
-        $query1->unionAll($query2);
+        $query1->unionAll($query2)->unionAll($query3);
         
         $salesList = $query1->get()->sortByDesc('sale_date')->values();
 
@@ -244,12 +263,18 @@ class ReportController extends Controller
                 'quantity' => $item->quantity,
                 'unit_price' => $item->unit_price,
                 'subtotal' => $item->subtotal,
+                'payment_method' => $item->payment_method,
             ];
         });
 
         // Calculamos totales
         $totalItems = $sales->sum('quantity');
         $totalRevenue = $sales->sum('subtotal');
+        
+        $totalEfectivo = $sales->where('payment_method', 'EFECTIVO')->sum('subtotal');
+        $totalQR = $sales->where('payment_method', 'QR')->sum('subtotal');
+        $totalTarjeta = $sales->where('payment_method', 'TARJETA')->sum('subtotal');
+        $totalCargado = $sales->whereNull('payment_method')->sum('subtotal');
 
         return Inertia::render('Admin/Reports/Sales', [
             'sales' => $sales,
@@ -262,6 +287,10 @@ class ReportController extends Controller
             'summary' => [
                 'total_items' => $totalItems,
                 'total_revenue' => $totalRevenue,
+                'total_efectivo' => $totalEfectivo,
+                'total_qr' => $totalQR,
+                'total_tarjeta' => $totalTarjeta,
+                'total_cargado' => $totalCargado,
             ],
         ]);
     }

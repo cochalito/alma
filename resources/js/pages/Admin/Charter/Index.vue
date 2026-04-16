@@ -45,6 +45,16 @@ function openCreateModal() {
     isModalOpen.value = true;
 }
 
+// Keep selectedReservation in sync with updated props for payments
+watch(() => props.reservations, (newData) => {
+    if (selectedReservation.value) {
+        const updated = newData.find(r => r.id === selectedReservation.value?.id);
+        if (updated) {
+            selectedReservation.value = updated;
+        }
+    }
+}, { deep: true });
+
 const selectedLocation = ref(props.location);
 const selectedDate = ref(props.date);
 
@@ -253,15 +263,15 @@ function getReservationColor(status: string) {
                                                  class="h-full w-full rounded-md p-2 text-xs shadow-sm flex flex-col justify-between overflow-hidden border cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all hover:opacity-90 active:scale-[0.98]"
                                                  :class="getReservationColor(getReservationStart(dept.id, day.date)!.status)">
                                                 <div>
-                                                    <div class="font-bold truncate leading-tight">
+                                                    <div class="font-bold leading-tight whitespace-normal break-words">
                                                         {{ getReservationStart(dept.id, day.date)?.customer?.firstname }} {{ getReservationStart(dept.id, day.date)?.customer?.lastname }}
                                                     </div>
-                                                    <div class="text-[9px] opacity-75 mt-0.5">
-                                                        Ref: #{{ getReservationStart(dept.id, day.date)?.id }}
+                                                    <div class="text-[11px] opacity-75 mt-0.5 font-medium italic">
+                                                        Reserva: #{{ getReservationStart(dept.id, day.date)?.id }}
                                                     </div>
                                                 </div>
-                                                <div class="text-[9px] opacity-90 font-medium">
-                                                    {{ getReservationStart(dept.id, day.date)?.check_in.substring(5) }} a {{ getReservationStart(dept.id, day.date)?.check_out.substring(5) }}
+                                                <div class="text-[11px] opacity-90 font-bold mt-1">
+                                                    {{ getReservationStart(dept.id, day.date)?.check_in.substring(5, 16) }} a {{ getReservationStart(dept.id, day.date)?.check_out.substring(5, 16) }}
                                                 </div>
                                             </div>
                                         </td>

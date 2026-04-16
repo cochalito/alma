@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductLocation;
 use App\Models\InventoryMovement;
+use App\Models\ExternalSale;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class ExternalSaleController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
+
         $allowedLocation = null;
         if ($user) {
             if (str_ends_with($user->role, '_LA_PAZ')) {
@@ -56,15 +57,17 @@ class ExternalSaleController extends Controller
             'location' => 'required|string|in:LP,UYUNI',
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
+            'payment_method' => 'required|string|in:EFECTIVO,QR,TARJETA',
         ]);
 
         DB::transaction(function () use ($validated, $user) {
-            $product_id = $validated['product_id'];
+            $product = Product::findOrFail($validated['product_id']);
             $location = $validated['location'];
             $quantity = $validated['quantity'];
+            $payment_method = $validated['payment_method'];
 
             // Reduce stock
-            $locationRecord = ProductLocation::where('product_id', $product_id)
+            $locationRecord = ProductLocation::where('product_id', $product->id)
                 ->where('location', $location)
                 ->first();
 
@@ -72,15 +75,26 @@ class ExternalSaleController extends Controller
                 $locationRecord->decrement('stock', $quantity);
             } else {
                 ProductLocation::create([
-                    'product_id' => $product_id,
+                    'product_id' => $product->id,
                     'location' => $location,
                     'stock' => -$quantity
                 ]);
             }
 
+            // Create External Sale Record
+            ExternalSale::create([
+                'product_id' => $product->id,
+                'user_id' => $user->id ?? null,
+                'location' => $location,
+                'quantity' => $quantity,
+                'unit_price' => $product->price,
+                'total_price' => $product->price * $quantity,
+                'payment_method' => $payment_method,
+            ]);
+
             // Create InventoryMovement for Venta Externa
             InventoryMovement::create([
-                'product_id' => $product_id,
+                'product_id' => $product->id,
                 'location' => $location,
                 'type' => 'out',
                 'quantity' => $quantity,
